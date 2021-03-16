@@ -1,6 +1,7 @@
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 import logging
 import time
+import os
 import requests
 from telegram.ext import (
     Updater,
@@ -11,10 +12,11 @@ from telegram.ext import (
     CallbackContext,
 )
 # Enable logging
-TOKEN = '1604293049:AAGNcvEYBwLabClllQdtvOhXVUE7FYgWnWk'
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
 )
+
 USER_ID = 1  # default 1 but when we want to update a user we just put its id
 USER_ENDPOINT = "http://127.0.0.1:8000/api/booking/user/"
 ACCESS_TOKEN_ENDPOINT = "http://127.0.0.1:8000/api/booking/token/"
