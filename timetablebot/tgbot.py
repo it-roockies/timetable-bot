@@ -29,10 +29,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TIMETABLE_URL = os.environ.get("TIMETABLE_URL")
-
-QUESTIONS_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
-ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
+logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
 STUDENT_ID, DATE_OF_BIRTH, EDUCATION_YEAR, FACULTY, SUBJECTS, TEACHER, QUESTION, ANSWER = range(8)
 
