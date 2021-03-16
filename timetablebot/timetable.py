@@ -41,8 +41,8 @@ def update_telegram_user(telegram_id: str, education_year: int, faculty: str):
         'Telegram-ID': f'{telegram_id}'
     }
     data = {
-        'education_year': username,
-        'faculty': email,
+        'education_year': education_year,
+        'faculty': faculty,
     }
     response = requests.post(url=TELEGRAM_USER_ENDPOINT, headers=headers, data=data)
     return response.json()
