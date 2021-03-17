@@ -8,6 +8,7 @@ TELEGRAM_USER_ENDPOINT = f"{TIMETABLE_URL}/api/telegramuser/"
 TELEGRAM_BOT_ENDPOINT = f"{TIMETABLE_URL}/api/telegrambot/"
 SUBJECT_ENDPOINT = f"{TIMETABLE_URL}/api/subject/"
 TEACHER_ENDPOINT = f"{TIMETABLE_URL}/api/teacher/"
+GROUP_ENDPOINT = f"{TIMETABLE_URL}/api/group/"
 
 QUESTION_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
 ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
@@ -35,14 +36,13 @@ def create_telegram_user(telegram_id: str, username: str, email: str):
     return response.json()
 
 
-def update_telegram_user(telegram_id: str, education_year: int, faculty: str):
+def update_telegram_user(telegram_id: str, group: int):
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
         'Telegram-ID': f'{telegram_id}'
     }
     data = {
-        'education_year': education_year,
-        'faculty': faculty,
+        'group': group,
     }
     response = requests.post(url=TELEGRAM_USER_ENDPOINT, headers=headers, data=data)
     return response.json()
@@ -63,6 +63,15 @@ def get_teachers(telegram_id: str):
         'Telegram-ID': f'{telegram_id}'
     }
     response = requests.get(url=TEACHER_ENDPOINT, headers=headers)
+    return response.json()
+
+
+def get_groups(telegram_id: str):
+    headers = {
+        'Authorization': f'Bot {TIMETABLE_TOKEN}',
+        'Telegram-ID': f'{telegram_id}'
+    }
+    response = requests.get(url=GROUP_ENDPOINT, headers=headers)
     return response.json()
 
 

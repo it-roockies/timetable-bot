@@ -18,6 +18,7 @@ from timetablebot.timetable import (
     update_telegram_user,
     get_subjects,
     get_teachers,
+    get_groups,
     get_questions,
     create_answer,
 )
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
-STUDENT_ID, DATE_OF_BIRTH, EDUCATION_YEAR, FACULTY, SUBJECTS, TEACHER, QUESTION, ANSWER = range(8)
+STUDENT_ID, DATE_OF_BIRTH, GROUP, SUBJECTS, TEACHER, QUESTION, ANSWER = range(8)
 
 
 def get_student_id(update: Update):
@@ -49,20 +50,34 @@ def get_date_of_birth(update: Update):
     return DATE_OF_BIRTH
 
 
-def get_education_year(update: Update):
-    reply_keyboard = [['1', '2', '3', '4']]
+# def get_education_year(update: Update):
+#     reply_keyboard = [['1', '2', '3', '4']]
+#     update.message.reply_text(
+#         "Please tell me about your education year "
+#         "for example (1, 2, 3, 4)",
+#         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
+#     )
+#     return EDUCATION_YEAR
+
+
+# def get_faculty(update: Update):
+#     update.message.reply_text("Now you need to tell me your faculty")
+#     return FACULTY
+
+
+def get_group(update: Update, context: CallbackContext):
+    telegram_id = update.message.from_user.id
+    logger.info(f"{telegram_id}: Get groups from server.")
+    groups = get_groups(telegram_id)
+    context.user_data['groups'] = groups
+
+    reply_keyboard = [group['name'] for group in groups]
     update.message.reply_text(
-        "Please tell me about your education year "
-        "for example (1, 2, 3, 4)",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
+        "Please choose in which group you are",
+        reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True)
     )
-    return EDUCATION_YEAR
 
-
-def get_faculty(update: Update):
-    update.message.reply_text("Now you need to tell me your faculty")
-    return FACULTY
-
+    return GROUP
 
 def get_subject(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
@@ -101,12 +116,12 @@ def start(update: Update, context: CallbackContext) -> int:
     logger.info(f"{telegram_id}: New user started the bot.")
     userinfo = get_userinfo(telegram_id)
 
-    if 'id' in userinfo and userinfo['faculty'] is not None and userinfo['education_year'] is not None:
+    if 'id' in userinfo and userinfo['group'] is not None:
         logger.info(f"{telegram_id}: User has already registered.")
         return get_subject(update, context)
     elif 'id' in userinfo:
         logger.info(f"{telegram_id}: User has already registered, but has not faculty or education_year.")
-        return get_education_year(update)
+        return get_group(update, context)
     else:
         logger.info(f"{telegram_id}: User is not yet registered.")
         return get_student_id(update)
@@ -144,24 +159,36 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
         return get_student_id(update)
 
 
-def education_year(update: Update, context: CallbackContext) -> int:
+def group(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much for your patience and effort.")
-    context.user_data['education_year'] = int(update.message.text)
-    return get_faculty(update)
-
-
-def faculty(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text("Cool. One more thing.")
 
     telegram_id = update.message.from_user.id
-    logger.info(f"{telegram_id}: Update users education_year and faculty.")
-    update_telegram_user(
-        telegram_id=telegram_id,
-        education_year=context.user_data['education_year'],
-        faculty=update.message.text
-    )
+    group = next(group['id'] for group in context.user_data['groups'] if group['name'] == update.message.text)
+
+    logger.info(f"{telegram_id}: Update users group.")
+    update_telegram_user(telegram_id=telegram_id, group=group)
 
     return get_subject(update, context)
+
+
+# def education_year(update: Update, context: CallbackContext) -> int:
+#     update.message.reply_text("Thank you so much for your patience and effort.")
+#     context.user_data['education_year'] = int(update.message.text)
+#     return get_faculty(update)
+
+
+# def faculty(update: Update, context: CallbackContext) -> int:
+#     update.message.reply_text("Cool. One more thing.")
+
+#     telegram_id = update.message.from_user.id
+#     logger.info(f"{telegram_id}: Update users education_year and faculty.")
+#     update_telegram_user(
+#         telegram_id=telegram_id,
+#         education_year=context.user_data['education_year'],
+#         faculty=update.message.text
+#     )
+
+#     return get_subject(update, context)
 
 
 def subjects(update: Update, context: CallbackContext) -> int:
@@ -217,8 +244,7 @@ def main() -> None:
         states={
             STUDENT_ID: [MessageHandler(Filters.text & ~Filters.command, student_id)],
             DATE_OF_BIRTH: [MessageHandler(Filters.text & ~Filters.command, date_of_birth)],
-            EDUCATION_YEAR: [MessageHandler(Filters.text & ~Filters.command, education_year)],
-            FACULTY: [MessageHandler(Filters.text & ~Filters.command, faculty)],
+            GROUP: [MessageHandler(Filters.text & ~Filters.command, group)],
             SUBJECTS: [MessageHandler(Filters.text & ~Filters.command, subjects)],
             TEACHER: [MessageHandler(Filters.text & ~Filters.command, teacher)],
             ANSWER: [MessageHandler(Filters.text & ~Filters.command, answer)]
