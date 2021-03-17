@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
-STUDENT_ID, DATE_OF_BIRTH, GROUP, SUBJECTS, TEACHER, QUESTION, ANSWER = range(8)
+STUDENT_ID, DATE_OF_BIRTH, GROUP, SUBJECTS, TEACHER, QUESTION, ANSWER = range(7)
 
 
 def get_student_id(update: Update):
