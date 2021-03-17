@@ -152,7 +152,7 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
     )
     if 'id' in userinfo:
         logger.info(f"{telegram_id}: User exist in Database.")
-        return get_education_year(update)
+        return get_group(update, context)
     else:
         logger.info(f"{telegram_id}: User is not exist in Database.")
         update.message.reply_text("Unfortunately, we could not find you in our system.")
