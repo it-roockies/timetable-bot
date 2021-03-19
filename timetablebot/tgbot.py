@@ -45,7 +45,7 @@ def get_student_id(update: Update):
 
 def get_date_of_birth(update: Update):
     update.message.reply_text(
-        "I see. Great, please enter your date of birth altogether (DDMMYYYY)"
+        "I see. Great, please enter email address."
     )
     return DATE_OF_BIRTH
 
@@ -192,26 +192,39 @@ def group(update: Update, context: CallbackContext) -> int:
 
 
 def subjects(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text("Thank you so much.")
+    update.message.reply_text("Thank you so much."
+                              , reply_markup=ReplyKeyboardRemove(),
+                              )
     context.user_data['subject'] = update.message.text
     return get_teacher(update, context)
+
 
 
 def teacher(update: Update, context: CallbackContext) -> int:
     context.user_data['teacher'] = update.message.text
 
     # get a question from database
-    questions = get_questions(update.message.from_user.id)
 
-    if len(questions) == 0:
-        update.message.reply_text("Sorry, but there are no querstions.")
+    context.user_data["questions"] = get_questions(update.message.from_user.id)
+    context.user_data['current'] = 0
+
+    if len(context.user_data['questions']) == 0:
+        update.message.reply_text("Sorry, but there are no questions.")
         return ConversationHandler.END
+    
+    return ask_question(update=update, context=context)
 
-    question1 = questions[0]['question_text']  # just default question
-    context.user_data['question'] = questions[0]['id'] # just default id
-    update.message.reply_text(question1)
+
+def ask_question(update, context):
+    """asks question from user"""
+
+    questions = context.user_data["questions"]
+    current = context.user_data["current"]
+    question_text = questions[current]['question_text']
+    update.message.reply_text(question_text)
 
     return ANSWER
+
 
 
 def answer(update: Update, context: CallbackContext) -> int:
@@ -219,20 +232,30 @@ def answer(update: Update, context: CallbackContext) -> int:
     subject = next(subject['id'] for subject in context.user_data['subjects'] if subject['name'] == context.user_data['subject'])
     teacher = next(teacher['id'] for teacher in context.user_data['teachers'] if teacher['short'] == context.user_data['teacher'])
 
+    questions = context.user_data["questions"]
+    current = context.user_data["current"]
+    question = questions[current]
+
     # post answer
     create_answer(
         telegram_id=telegram_id,
         subject=subject,
         teacher=teacher,
-        question=context.user_data['question'],
+        question=question["id"],
         answer=update.message.text,
     )
-    update.message.reply_text(
-        "Thank you for your time and effort. "
-        "You have added value to our growth. "
-        "Do you want to give comment click here /start "
-    )
-    return ConversationHandler.END
+
+    if current < len(questions) - 1:
+        context.user_data['current'] = current + 1
+        return ask_question(update=update, context=context)
+    else:
+        update.message.reply_text(
+            "Thank you for your time and effort. \n"
+            "You have added value to our growth. \n"
+            "Do you want to give comment click here /start ",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return ConversationHandler.END
 
 def main() -> None:
     updater = Updater(token=TOKEN)
