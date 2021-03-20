@@ -2,6 +2,7 @@ from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 import logging
 import time
 import os
+import json
 import requests
 from telegram.ext import (
     Updater,
@@ -21,6 +22,7 @@ from timetablebot.timetable import (
     get_groups,
     get_questions,
     create_answer,
+    get_choices,
 )
 from timetablebot.utils import build_menu
 
@@ -204,8 +206,11 @@ def teacher(update: Update, context: CallbackContext) -> int:
     context.user_data['teacher'] = update.message.text
 
     # get a question from database
-
+    print(get_choices(update.message.from_user.id))
     context.user_data["questions"] = get_questions(update.message.from_user.id)
+    print(get_questions(update.message.from_user.id))
+    # if context.user_data['questions']['choice'] is None:
+
     context.user_data['current'] = 0
 
     if len(context.user_data['questions']) == 0:
@@ -220,11 +225,18 @@ def ask_question(update, context):
 
     questions = context.user_data["questions"]
     current = context.user_data["current"]
-    question_text = questions[current]['question_text']
-    update.message.reply_text(question_text)
+    current_question = questions[current]
+    question_text = current_question['question_text']
+    if current_question['choice'] is None:
+        update.message.reply_text(question_text, reply_markup=ReplyKeyboardRemove())
+        return ANSWER
+    else:
+        reply_keyboard = [json.loads(choice['variant']) for choice in get_choices(update.message.from_user.id) if choice['id'] == current_question['choice']]
+        update.message.reply_text(question_text,
+                                    reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+                                  )
 
-    return ANSWER
-
+        return ANSWER
 
 
 def answer(update: Update, context: CallbackContext) -> int:

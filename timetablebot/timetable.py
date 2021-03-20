@@ -12,6 +12,7 @@ GROUP_ENDPOINT = f"{TIMETABLE_URL}/api/group/"
 
 QUESTION_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
 ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
+CHOICE_ENDPOINT = f"{TIMETABLE_URL}/api/choice/"
 
 
 def get_userinfo(telegram_id: str):
@@ -63,6 +64,14 @@ def get_teachers(telegram_id: str):
         'Telegram-ID': f'{telegram_id}'
     }
     response = requests.get(url=TEACHER_ENDPOINT, headers=headers)
+    return response.json()
+
+def get_choices(telegram_id: str):
+    headers = {
+        'Authorization': f'Bot {TIMETABLE_TOKEN}',
+        'Telegram-ID': f'{telegram_id}'
+    }
+    response = requests.get(url=CHOICE_ENDPOINT, headers=headers)
     return response.json()
 
 
