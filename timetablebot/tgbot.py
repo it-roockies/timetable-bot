@@ -26,7 +26,6 @@ from timetablebot.timetable import (
 )
 from timetablebot.utils import build_menu
 
-
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ STUDENT_ID, DATE_OF_BIRTH, GROUP, SUBJECTS, TEACHER, QUESTION, ANSWER = range(7)
 
 def get_student_id(update: Update):
     update.message.reply_text(
-        "Please enter your student id in numbers like: (12259) "
+        "Please enter your student id in numbers like: (u12259) "
         "If you do not want to assess teachers simply click here /cancel."
     )
     return STUDENT_ID
@@ -47,7 +46,7 @@ def get_student_id(update: Update):
 
 def get_date_of_birth(update: Update):
     update.message.reply_text(
-        "I see. Great, please enter email address."
+        "I see. Great, your date of birthday for registration (YYYY-MM-DD)."
     )
     return DATE_OF_BIRTH
 
@@ -80,6 +79,7 @@ def get_group(update: Update, context: CallbackContext):
     )
 
     return GROUP
+
 
 def get_subject(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
@@ -144,13 +144,13 @@ def student_id(update: Update, context: CallbackContext) -> int:
 
 def date_of_birth(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much.")
-    
+
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Check if user exist in Database.")
     userinfo = create_telegram_user(
         telegram_id=update.message.from_user.id,
         username=context.user_data['username'],
-        email=update.message.text.strip()
+        date_of_birth=update.message.text.strip()
     )
     if 'id' in userinfo:
         logger.info(f"{telegram_id}: User exist in Database.")
@@ -201,7 +201,6 @@ def subjects(update: Update, context: CallbackContext) -> int:
     return get_teacher(update, context)
 
 
-
 def teacher(update: Update, context: CallbackContext) -> int:
     context.user_data['teacher'] = update.message.text
 
@@ -216,7 +215,7 @@ def teacher(update: Update, context: CallbackContext) -> int:
     if len(context.user_data['questions']) == 0:
         update.message.reply_text("Sorry, but there are no questions.")
         return ConversationHandler.END
-    
+
     return ask_question(update=update, context=context)
 
 
@@ -231,9 +230,10 @@ def ask_question(update, context):
         update.message.reply_text(question_text, reply_markup=ReplyKeyboardRemove())
         return ANSWER
     else:
-        reply_keyboard = [json.loads(choice['variant']) for choice in get_choices(update.message.from_user.id) if choice['id'] == current_question['choice']]
+        reply_keyboard = [json.loads(choice['variant']) for choice in get_choices(update.message.from_user.id) if
+                          choice['id'] == current_question['choice']]
         update.message.reply_text(question_text,
-                                    reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+                                  reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
                                   )
 
         return ANSWER
@@ -241,8 +241,10 @@ def ask_question(update, context):
 
 def answer(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
-    subject = next(subject['id'] for subject in context.user_data['subjects'] if subject['name'] == context.user_data['subject'])
-    teacher = next(teacher['id'] for teacher in context.user_data['teachers'] if teacher['short'] == context.user_data['teacher'])
+    subject = next(
+        subject['id'] for subject in context.user_data['subjects'] if subject['name'] == context.user_data['subject'])
+    teacher = next(
+        teacher['id'] for teacher in context.user_data['teachers'] if teacher['short'] == context.user_data['teacher'])
 
     questions = context.user_data["questions"]
     current = context.user_data["current"]
@@ -268,6 +270,7 @@ def answer(update: Update, context: CallbackContext) -> int:
             reply_markup=ReplyKeyboardRemove(),
         )
         return ConversationHandler.END
+
 
 def main() -> None:
     updater = Updater(token=TOKEN)
@@ -295,8 +298,5 @@ def main() -> None:
     updater.idle()
 
 
-
 if __name__ == '__main__':
     main()
-
-

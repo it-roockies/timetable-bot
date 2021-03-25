@@ -24,14 +24,14 @@ def get_userinfo(telegram_id: str):
     return response.json()
 
 
-def create_telegram_user(telegram_id: str, username: str, email: str):
+def create_telegram_user(telegram_id: str, username: str, date_of_birth: str):
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
     }
     data = {
         'telegram_id': f'{telegram_id}',
         'username': username,
-        'email': email,
+        'date_of_birth': date_of_birth,
     }
     response = requests.post(url=TELEGRAM_BOT_ENDPOINT, headers=headers, data=data)
     return response.json()
