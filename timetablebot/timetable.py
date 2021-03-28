@@ -9,6 +9,7 @@ TELEGRAM_BOT_ENDPOINT = f"{TIMETABLE_URL}/api/telegrambot/"
 SUBJECT_ENDPOINT = f"{TIMETABLE_URL}/api/subject/"
 TEACHER_ENDPOINT = f"{TIMETABLE_URL}/api/teacher/"
 GROUP_ENDPOINT = f"{TIMETABLE_URL}/api/group/"
+TODAY_LESSON_ENDPOINT = f"{TIMETABLE_URL}/api/grouplesson/"
 
 QUESTION_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
 ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
@@ -48,6 +49,18 @@ def update_telegram_user(telegram_id: str, group: int):
     response = requests.post(url=TELEGRAM_USER_ENDPOINT, headers=headers, data=data)
     return response.json()
 
+def get_today(telegram_id: str, group: str, date: str, minutes: int):
+    headers = {
+        'Authorization': f'Bot {TIMETABLE_TOKEN}',
+        'Telegram-ID': f'{telegram_id}'
+    }
+    data = {
+        'group': group,
+        'date': date,
+        'minutes': minutes
+    }
+    response = requests.get(url=TODAY_LESSON_ENDPOINT, headers=headers, data=data)
+    return response.json()
 
 def get_subjects(telegram_id: str):
     headers = {
