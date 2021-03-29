@@ -41,12 +41,15 @@ def create_telegram_user(telegram_id: str, username: str, date_of_birth: str):
 def update_telegram_user(telegram_id: str, group: int):
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
+        'Telegram-ID': f'{telegram_id}',
+        'Content-Type': 'application/json'
     }
-    data = {
-        'group': group,
-    }
-    response = requests.post(url=TELEGRAM_USER_ENDPOINT, headers=headers, data=data)
+    print(group)
+    # data = {
+    #     "group": {"id": group}
+    # }
+    payload = "{\n    \"group\": {\"id\": %d }\n}" %group
+    response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
     return response.json()
 
 def get_today(telegram_id: str, group: str, date: str, minutes: int):

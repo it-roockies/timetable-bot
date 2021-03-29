@@ -41,8 +41,11 @@ STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, QUEST
 def today(update: Update, context: CallbackContext):
     """returns today's lessons for user"""
     telegram_id = update.message.from_user.id
+    choice_keyboard = [['assessing', 'today', 'now']]
+    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     user_info = get_userinfo(telegram_id)
     group = user_info['group']['name']
+    print(group)
     global date
     date = date.today()
     minutes = datetime.now().minute + datetime.now().hour * 60
@@ -52,6 +55,9 @@ def today(update: Update, context: CallbackContext):
         date=date,
         minutes=minutes
     )
+    if 'message' in today_lessons:
+        update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
+        return CHOOSING
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     today_lsn = ''
@@ -69,6 +75,8 @@ def today(update: Update, context: CallbackContext):
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
     telegram_id = update.message.from_user.id
+    choice_keyboard = [['assessing', 'today', 'now']]
+    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     user_info = get_userinfo(telegram_id)
     group = user_info['group']['name']
     global date
@@ -81,9 +89,15 @@ def now(update: Update, context: CallbackContext):
         minutes=minutes
     )
 
+    if 'message' in today_lessons:
+        update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
+        return CHOOSING
     msg = today_lessons['now_lesson']
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    if 'message' in today_lessons:
+        update.message.reply_text(f'{today_lessons["message"]}. Please choose what do you want?', reply_markup=keyboard)
+        return CHOOSING
     if 'message' in msg:
         lesson = msg['message']
     else:
@@ -148,6 +162,7 @@ def get_subject(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Get subjects from server.")
     userinfo = get_userinfo(telegram_id=telegram_id)
+    print(userinfo)
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(), minutes=minutes)  # get today's lesson
     if len(today_lesson) == 1 and 'message' in today_lesson:
@@ -172,7 +187,11 @@ def get_teacher(update: Update, context: CallbackContext):
     userinfo = get_userinfo(telegram_id=telegram_id)
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(), minutes=minutes)  # get today's lesson
-    teacher = [lesson['teacher'] for lesson in today_lesson['today_lessons']]
+    print(today_lesson)
+    if 'message' in today_lesson:
+        update.message.reply_text(today_lesson['message'])
+        return CHOOSING
+    teacher = [lesson['teacher'] for lesson in today_lesson['today_lessons'] if lesson['subject'] == context.user_data['subject']]
     context.user_data['teacher'] = teacher[0]
 
     context.user_data["questions"] = get_questions(update.message.from_user.id)
@@ -249,9 +268,10 @@ def group(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = next(group['id'] for group in context.user_data['groups'] if group['name'] == update.message.text)
     context.user_data['group'] = update.message.text
-    print(context.user_data['group'])
+    print(context.user_data['group'], group)
     logger.info(f"{telegram_id}: Update users group.")
-    update_telegram_user(telegram_id=telegram_id, group=group)
+    update_telegram_user(telegram_id=telegram_id, group=int(group))
+    print(update_telegram_user(telegram_id=telegram_id, group=int(group)))
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)
