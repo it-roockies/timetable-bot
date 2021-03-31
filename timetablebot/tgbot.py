@@ -24,7 +24,8 @@ from timetablebot.timetable import (
     get_questions,
     create_answer,
     get_choices,
-    get_today
+    get_today,
+    get_messages
 )
 from timetablebot.utils import build_menu
 from datetime import date
@@ -108,18 +109,15 @@ def now(update: Update, context: CallbackContext):
     update.message.reply_text(f'{lesson}. Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
 
-def get_student_id(update: Update):
-    update.message.reply_text(
-        "Please enter your student id in numbers like: (u12259) "
-        "If you do not want to assess teachers simply click here /cancel."
-    )
+def get_student_id(update: Update, context: CallbackContext):
+    get_student_id_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET USERNAME"][0]
+    update.message.reply_text(get_student_id_message)
     return STUDENT_ID
 
 
-def get_date_of_birth(update: Update):
-    update.message.reply_text(
-        "I see. Great, your date of birthday for registration (YYYY-MM-DD)."
-    )
+def get_date_of_birth(update: Update, context: CallbackContext):
+    get_date_of_birth_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET DATE_OF_BIRTH"][0]
+    update.message.reply_text(get_date_of_birth_message)
     return DATE_OF_BIRTH
 
 
@@ -150,10 +148,8 @@ def get_group(update: Update, context: CallbackContext):
     context.user_data['groups'] = groups
 
     reply_keyboard = [group['name'] for group in groups]
-    update.message.reply_text(
-        "Please choose in which group you are",
-        reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True, resize_keyboard=True)
-    )
+    get_group_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET GROUP"][0]
+    update.message.reply_text(get_group_message, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True, resize_keyboard=True))
 
     return GROUP
 
@@ -170,10 +166,8 @@ def get_subject(update: Update, context: CallbackContext):
         return ConversationHandler.END
     subjects = [lesson['subject'] for lesson in today_lesson['today_lessons']]
     reply_keyboard = subjects  # [subject['name'] for subject in subjects]
-    update.message.reply_text(
-        "Please choose which subject do you want to give your comments",
-        reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3), one_time_keyboard=True, resize_keyboard=True)
-    )
+    teacher_comment_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "COMMENT SUBJECT"][0]
+    update.message.reply_text(teacher_comment_message, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3), one_time_keyboard=True, resize_keyboard=True))
 
     return SUBJECTS
 
@@ -214,8 +208,10 @@ def get_teacher(update: Update, context: CallbackContext):
 
 
 def start(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text("Hello, this bot serves you to assess teacher in TTPU.")
-
+    messages = get_messages()
+    context.user_data['messages'] = messages
+    welcome_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "START"][0]
+    update.message.reply_text(welcome_message)
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
     userinfo = get_userinfo(telegram_id)
@@ -227,20 +223,18 @@ def start(update: Update, context: CallbackContext) -> int:
         return get_group(update, context)
     else:
         logger.info(f"{telegram_id}: User is not yet registered.")
-        return get_student_id(update)
+        return get_student_id(update, context)
 
 
 def cancel(update: Update, context: CallbackContext) -> int:
-    update.message.reply_text(
-        'Ok, If you want to add more value to TTPU we are here'
-        "Just click here /start "
-    )
+    cancel_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "CANCEL"][0]
+    update.message.reply_text(cancel_message)
     return ConversationHandler.END
 
 
 def student_id(update: Update, context: CallbackContext) -> int:
     context.user_data['username'] = update.message.text.strip()
-    return get_date_of_birth(update)
+    return get_date_of_birth(update, context)
 
 
 def date_of_birth(update: Update, context: CallbackContext) -> int:
@@ -258,7 +252,8 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
         return get_group(update, context)
     else:
         logger.info(f"{telegram_id}: User is not exist in Database.")
-        update.message.reply_text("Unfortunately, we could not find you in our system.")
+        user_not_found_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "USER NOT FOUND"][0]
+        update.message.reply_text(user_not_found_message)
         return get_student_id(update)
 
 
@@ -378,12 +373,10 @@ def answer(update: Update, context: CallbackContext) -> int:
         context.user_data['current'] = current + 1
         return ask_question(update=update, context=context)
     else:
-        update.message.reply_text(
-            "Thank you for your time and effort. \n"
-            "You have added value to our growth. \n"
-            "Do you want to give comment click here /start ",
-            reply_markup=ReplyKeyboardRemove(),
-        )
+        end_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "END"][0]
+        update.message.reply_text(end_message,
+                                  reply_markup=ReplyKeyboardRemove(),
+                                  )
         return ConversationHandler.END
 
 
