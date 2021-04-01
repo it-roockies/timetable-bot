@@ -69,6 +69,22 @@ class Message:
         return self.messages[item]
 
 
+class Message(object):
+
+    def __init__(self, messages):
+
+        self.messages = {
+            message['message_id']: message['text']
+            for message in messages
+        }
+
+    def __getattribute__(self, item):
+        messages = super(Message, self).__getattribute__('messages')
+        if item not in messages:
+            raise ValueError(f"{item} is not in messages")
+        return messages[item]
+
+
 def get_messages():
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
@@ -77,6 +93,7 @@ def get_messages():
     response_json = response.json()
 
     return Message(response_json)
+
 
 def get_today(telegram_id: str, group: str, date: str, minutes: int):
     headers = {
@@ -89,7 +106,8 @@ def get_today(telegram_id: str, group: str, date: str, minutes: int):
         'minutes': minutes
     }
     response = requests.get(url=TODAY_LESSON_ENDPOINT, headers=headers, data=data)
-    return response.json()
+    response_json = response.json()
+    return response_json
 
 def get_subjects(telegram_id: str):
     headers = {

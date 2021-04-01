@@ -38,64 +38,80 @@ logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
 STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, QUESTION, ANSWER = range(10)
 
-
-def today(update: Update, context: CallbackContext):
-    """returns today's lessons for user"""
+def this_day_info(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
-    choice_keyboard = [['assessing', 'today', 'now']]
-    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     user_info = get_userinfo(telegram_id)
     group = user_info['group']['name']
-    print(group)
     global date
     date = date.today()
     minutes = datetime.now().minute + datetime.now().hour * 60
+    # get today's lessons
     today_lessons = get_today(
         telegram_id=telegram_id,
         group=group,
         date=date,
         minutes=minutes
     )
-    if 'message' in today_lessons:
-        update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
-        return CHOOSING
-    choice_keyboard = [['assessing', 'today', 'now']]
-    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    return today_lessons
+
+def reform_day(obj):
+    """formats lesson to human friendly format"""
     today_lsn = ''
-    for lesson in today_lessons['today_lessons']:
+    for lesson in obj['today_lessons']:
         full_lsn = ''
         for k, v in dict(lesson).items():
             lsn = f"{k}:     {v} \n"
             full_lsn += lsn
             today_lsn += f"{lsn}"
         today_lsn += '\n\n'
+    return today_lsn
 
-    update.message.reply_text(f'today you have:\n {today_lsn} Please choose what do you want?', reply_markup=keyboard)
+def presently(update: Update, context: CallbackContext):
+    lesson = this_day_info(update, context)
+    lesson = reform_day(lesson)
+    update.message.reply_text(lesson)
+
+def at_present(update: Update, context: CallbackContext):
+    today_lessons = this_day_info(update, context)
+    if 'message' in today_lessons:
+        update.message.reply_text(today_lessons['message'])
+    msg = today_lessons['now_lesson']
+    if 'message' in today_lessons:
+        update.message.reply_text(today_lessons["message"])
+    if 'message' in msg:
+        lesson = msg['message']
+    else:
+        lesson = ''
+        for k, v in msg.items():
+            row = f"{k}:    {v} \n"
+            lesson += row
+    update.message.reply_text(lesson)
+
+
+def today(update: Update, context: CallbackContext):
+    """returns today's lessons for user"""
+    today_lessons = this_day_info(update, context)  # get today's lesson
+    choice_keyboard = [['assessing', 'today', 'now']]
+    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    if 'message' in today_lessons:
+        update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
+        return CHOOSING
+
+    lesson_text = reform_day(today_lessons)
+
+    update.message.reply_text(f'today you have:\n {lesson_text} Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
 
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
-    telegram_id = update.message.from_user.id
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
-    user_info = get_userinfo(telegram_id)
-    group = user_info['group']['name']
-    global date
-    date = date.today()
-    minutes = datetime.now().minute + datetime.now().hour * 60
-    today_lessons = get_today(
-        telegram_id=telegram_id,
-        group=group,
-        date=date,
-        minutes=minutes
-    )
+    today_lessons = this_day_info(update, context)  # get today's lesson
 
     if 'message' in today_lessons:
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
         return CHOOSING
     msg = today_lessons['now_lesson']
-    choice_keyboard = [['assessing', 'today', 'now']]
-    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     if 'message' in today_lessons:
         update.message.reply_text(f'{today_lessons["message"]}. Please choose what do you want?', reply_markup=keyboard)
         return CHOOSING
@@ -110,14 +126,14 @@ def now(update: Update, context: CallbackContext):
     return CHOOSING
 
 def get_student_id(update: Update, context: CallbackContext):
-    get_student_id_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET USERNAME"][0]
-    update.message.reply_text(get_student_id_message)
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.USERNAME)
     return STUDENT_ID
 
 
 def get_date_of_birth(update: Update, context: CallbackContext):
-    get_date_of_birth_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET DATE_OF_BIRTH"][0]
-    update.message.reply_text(get_date_of_birth_message)
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.BIRTH)
     return DATE_OF_BIRTH
 
 
@@ -148,8 +164,8 @@ def get_group(update: Update, context: CallbackContext):
     context.user_data['groups'] = groups
 
     reply_keyboard = [group['name'] for group in groups]
-    get_group_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "GET GROUP"][0]
-    update.message.reply_text(get_group_message, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True, resize_keyboard=True))
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.GROUP, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True, resize_keyboard=True))
 
     return GROUP
 
@@ -166,8 +182,8 @@ def get_subject(update: Update, context: CallbackContext):
         return ConversationHandler.END
     subjects = [lesson['subject'] for lesson in today_lesson['today_lessons']]
     reply_keyboard = subjects  # [subject['name'] for subject in subjects]
-    teacher_comment_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "COMMENT SUBJECT"][0]
-    update.message.reply_text(teacher_comment_message, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3), one_time_keyboard=True, resize_keyboard=True))
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.COMMENTSUBJECT, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3), one_time_keyboard=True, resize_keyboard=True))
 
     return SUBJECTS
 
@@ -210,8 +226,7 @@ def get_teacher(update: Update, context: CallbackContext):
 def start(update: Update, context: CallbackContext) -> int:
     messages = get_messages()
     context.user_data['messages'] = messages
-    welcome_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "START"][0]
-    update.message.reply_text(welcome_message)
+    update.message.reply_text(messages.START)
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
     userinfo = get_userinfo(telegram_id)
@@ -227,8 +242,8 @@ def start(update: Update, context: CallbackContext) -> int:
 
 
 def cancel(update: Update, context: CallbackContext) -> int:
-    cancel_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "CANCEL"][0]
-    update.message.reply_text(cancel_message)
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.CANCEL)
     return ConversationHandler.END
 
 
@@ -252,9 +267,9 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
         return get_group(update, context)
     else:
         logger.info(f"{telegram_id}: User is not exist in Database.")
-        user_not_found_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "USER NOT FOUND"][0]
-        update.message.reply_text(user_not_found_message)
-        return get_student_id(update)
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.NOTFOUND)
+        return get_student_id(update, context)
 
 
 def group(update: Update, context: CallbackContext) -> int:
@@ -373,8 +388,8 @@ def answer(update: Update, context: CallbackContext) -> int:
         context.user_data['current'] = current + 1
         return ask_question(update=update, context=context)
     else:
-        end_message = [message['text'] for message in context.user_data['messages'] if message['message_id'] == "END"][0]
-        update.message.reply_text(end_message,
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.END,
                                   reply_markup=ReplyKeyboardRemove(),
                                   )
         return ConversationHandler.END
@@ -384,7 +399,8 @@ def main() -> None:
     updater = Updater(token=TOKEN)
 
     dispatcher = updater.dispatcher
-
+    today_handler = CommandHandler('today', presently)
+    now_handler = CommandHandler('now', at_present)
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
@@ -403,7 +419,8 @@ def main() -> None:
     )
 
     dispatcher.add_handler(handler=conv_handler)
-
+    dispatcher.add_handler(handler=today_handler)
+    dispatcher.add_handler(handler=now_handler)
     updater.start_polling()
 
     updater.idle()
