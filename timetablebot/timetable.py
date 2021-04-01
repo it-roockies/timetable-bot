@@ -53,12 +53,30 @@ def update_telegram_user(telegram_id: str, group: int):
     response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
     return response.json()
 
+
+class Message:
+
+    def __init__(self, messages):
+
+        self.messages = {
+        message['message_id']: message['text']
+        for message in messages
+    }
+
+    def __getattribute__(self, item):
+        if item not in self.messages:
+            raise ValueError(f"{item} is not in messages")
+        return self.messages[item]
+
+
 def get_messages():
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
     }
     response = requests.get(url=MESSAGE_ENDPOINT, headers=headers)
-    return response.json()
+    response_json = response.json()
+
+    return Message(response_json)
 
 def get_today(telegram_id: str, group: str, date: str, minutes: int):
     headers = {
