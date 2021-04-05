@@ -34,22 +34,26 @@ jobs:
       - name: Build wheel file
         run: |
           find . -type d | grep __pycache__ | xargs rm -rf
-          python setup.py bdist_wheel --build-number 0 -d .
+          python setup.py bdist_wheel --build-number 0 --python-tag py37 -d .
       - name: copy file via ssh
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "timetablebot-1.0.0-0-py38-none-any.whl"
-          target: "/home/ubuntu/timetablebot/"
+          host: ${{ secrets.DEPLOY_REMOTE_HOST }}
+          port: ${{ secrets.DEPLOY_REMOTE_PORT }}
+          username: ${{ secrets.DEPLOY_REMOTE_USER }}
+          key: ${{ secrets.DEPLOY_SERVER_SSH_KEY }}
+          source: "timetablebot-1.0.0-0-py37-none-any.whl"
+          target: ${{ secrets.DEPLOY_REMOTE_TARGET }}
       - name: Deploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.DEPLOY_REMOTE_HOST }}
+          port: ${{ secrets.DEPLOY_REMOTE_PORT }}
+          username: ${{ secrets.DEPLOY_REMOTE_USER }}
+          key: ${{ secrets.DEPLOY_SERVER_SSH_KEY }}
           script: |
-            cd /home/ubuntu/timetablebot/
-            sudo pip3 install timetablebot-1.0.0-0-py38-none-any.whl  -U
-            sudo supervisorctl restart timetablebot
+            cd ${{ secrets.DEPLOY_REMOTE_TARGET }}
+            source venv/bin/activate
+            pip install timetablebot-1.0.0-0-py37-none-any.whl -U
+            rm timetable-1.0.0-0-py37-none-any.whl
+            sudo supervisorctl restart timetable-bot
