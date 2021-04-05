@@ -1,5 +1,8 @@
 import os
+import logging
 import requests
+
+logger = logging.getLogger(__name__)
 
 TIMETABLE_URL = os.environ.get("TIMETABLE_URL")
 TIMETABLE_TOKEN = os.environ.get("TIMETABLE_TOKEN")
@@ -53,22 +56,6 @@ def update_telegram_user(telegram_id: str, group: int):
     response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
     return response.json()
 
-
-class Message:
-
-    def __init__(self, messages):
-
-        self.messages = {
-        message['message_id']: message['text']
-        for message in messages
-    }
-
-    def __getattribute__(self, item):
-        if item not in self.messages:
-            raise ValueError(f"{item} is not in messages")
-        return self.messages[item]
-
-
 class Message(object):
 
     def __init__(self, messages):
@@ -81,7 +68,8 @@ class Message(object):
     def __getattribute__(self, item):
         messages = super(Message, self).__getattribute__('messages')
         if item not in messages:
-            raise ValueError(f"{item} is not in messages")
+            logger.error(f"{item} is not in messages")
+            return item
         return messages[item]
 
 
