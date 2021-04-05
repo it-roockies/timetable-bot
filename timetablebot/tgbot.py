@@ -28,7 +28,8 @@ from timetablebot.timetable import (
     get_messages
 )
 from timetablebot.utils import build_menu
-from datetime import date
+
+
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -226,7 +227,7 @@ def get_teacher(update: Update, context: CallbackContext):
 def start(update: Update, context: CallbackContext) -> int:
     messages = get_messages()
     context.user_data['messages'] = messages
-    update.message.reply_text(messages.START)
+    update.message.reply_text(messages.START, reply_markup=ReplyKeyboardRemove())
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
     userinfo = get_userinfo(telegram_id)
