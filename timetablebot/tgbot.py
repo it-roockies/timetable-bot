@@ -230,11 +230,11 @@ def start(update: Update, context: CallbackContext) -> int:
     update.message.reply_text(messages.START, reply_markup=ReplyKeyboardRemove())
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
-    userinfo = get_userinfo(telegram_id)
-    if 'id' in userinfo and userinfo['group'] is not None:
+    user_info = get_userinfo(telegram_id)
+    if user_info and 'id' in user_info and user_info['group'] is not None:
         logger.info(f"{telegram_id}: User has already registered.")
         return choice(update, context)
-    elif 'id' in userinfo:
+    elif user_info and 'id' in user_info:
         logger.info(f"{telegram_id}: User has already registered, but has not faculty or education_year.")
         return get_group(update, context)
     else:
@@ -258,12 +258,12 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
 
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Check if user exist in Database.")
-    userinfo = create_telegram_user(
+    user_info = create_telegram_user(
         telegram_id=update.message.from_user.id,
         username=context.user_data['username'],
         date_of_birth=update.message.text.strip()
     )
-    if 'id' in userinfo:
+    if user_info and 'id' in user_info:
         logger.info(f"{telegram_id}: User exist in Database.")
         return get_group(update, context)
     else:
@@ -274,15 +274,21 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
 
 
 def group(update: Update, context: CallbackContext) -> int:
+    group_name = update.message.text
+    telegram_id = update.message.from_user.id
+    group = next((group['id'] for group in context.user_data['groups'] if group['name'] == group_name), None)
+    if group is None:
+        logger.info(f"{telegram_id}: User entered wrong group {group_name}.")
+        update.message.reply_text("You entered wrong group name.", reply_markup=ReplyKeyboardRemove())
+        return get_group(update, context)
+
+    logger.info(f"{telegram_id}: Update users group {group_name}.")
     update.message.reply_text("Thank you so much for your patience and effort.")
 
-    telegram_id = update.message.from_user.id
-    group = next(group['id'] for group in context.user_data['groups'] if group['name'] == update.message.text)
-    context.user_data['group'] = update.message.text
-    print(context.user_data['group'], group)
-    logger.info(f"{telegram_id}: Update users group.")
+    context.user_data['group'] = group_name
+
     update_telegram_user(telegram_id=telegram_id, group=int(group))
-    print(update_telegram_user(telegram_id=telegram_id, group=int(group)))
+
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)

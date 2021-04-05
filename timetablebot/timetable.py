@@ -20,46 +20,50 @@ ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
 CHOICE_ENDPOINT = f"{TIMETABLE_URL}/api/choice/"
 
 
-def get_userinfo(telegram_id: str):
+def request(*, method: str, url: str, telegram_id=None, data=None):
     headers = {
         'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
     }
-    response = requests.get(url=TELEGRAM_USER_ENDPOINT, headers=headers)
-    return response.json()
+    if telegram_id is not None:
+        headers.update({
+            'Telegram-ID': f'{telegram_id}',
+        })
+
+    try:
+        response = requests.request(method=method, url=url, headers=headers, data=data)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.exception(str(e))
+        if hasattr(e, "response"):
+            logger.debug(e.response.text)
+        return None
+
+
+def get_userinfo(telegram_id: str):
+    return request(method="GET", url=TELEGRAM_USER_ENDPOINT, telegram_id=telegram_id)
 
 
 def create_telegram_user(telegram_id: str, username: str, date_of_birth: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-    }
     data = {
         'telegram_id': f'{telegram_id}',
         'username': username,
         'date_of_birth': date_of_birth,
     }
-    response = requests.post(url=TELEGRAM_BOT_ENDPOINT, headers=headers, data=data)
-    return response.json()
+    return request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=data)
 
 
 def update_telegram_user(telegram_id: str, group: int):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}',
-        'Content-Type': 'application/json'
+    data = {
+        "group": {
+            "id": group,
+        },
     }
-    print(group)
-    # data = {
-    #     "group": {"id": group}
-    # }
-    payload = "{\n    \"group\": {\"id\": %d }\n}" %group
-    response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
-    return response.json()
+    return request(method="POST", url=TELEGRAM_USER_ENDPOINT, telegram_id=telegram_id, data=data)
+
 
 class Message(object):
-
     def __init__(self, messages):
-
         self.messages = {
             message['message_id']: message['text']
             for message in messages
@@ -74,83 +78,45 @@ class Message(object):
 
 
 def get_messages():
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-    }
-    response = requests.get(url=MESSAGE_ENDPOINT, headers=headers)
-    response_json = response.json()
-
-    return Message(response_json)
+    response = request(method="GET", url=MESSAGE_ENDPOINT)
+    return Message(response)
 
 
 def get_today(telegram_id: str, group: str, date: str, minutes: int):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
     data = {
         'group': group,
         'date': date,
         'minutes': minutes
     }
-    response = requests.get(url=TODAY_LESSON_ENDPOINT, headers=headers, data=data)
-    response_json = response.json()
-    return response_json
+    return request(method="GET", url=TODAY_LESSON_ENDPOINT, telegram_id=telegram_id, data=data)
+
 
 def get_subjects(telegram_id: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
-    response = requests.get(url=SUBJECT_ENDPOINT, headers=headers)
+    response = requests.get(url=SUBJECT_ENDPOINT, telegram_id=telegram_id)
     return response.json()
 
 
 def get_teachers(telegram_id: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
-    response = requests.get(url=TEACHER_ENDPOINT, headers=headers)
-    return response.json()
+    return request(method="GET", url=TEACHER_ENDPOINT, telegram_id=telegram_id)
+
 
 def get_choices(telegram_id: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
-    response = requests.get(url=CHOICE_ENDPOINT, headers=headers)
-    return response.json()
+    return request(method="GET", url=CHOICE_ENDPOINT, telegram_id=telegram_id)
 
 
 def get_groups(telegram_id: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
-    response = requests.get(url=GROUP_ENDPOINT, headers=headers)
-    return response.json()
+    return request(method="GET", url=GROUP_ENDPOINT, telegram_id=telegram_id)
 
 
 def get_questions(telegram_id: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
-    response = requests.get(url=QUESTION_ENDPOINT, headers=headers)
-    return response.json()
+    return request(method="GET", url=QUESTION_ENDPOINT, telegram_id=telegram_id)
 
 
 def create_answer(telegram_id: str, subject: int, teacher: int, question: int, answer: str):
-    headers = {
-        'Authorization': f'Bot {TIMETABLE_TOKEN}',
-        'Telegram-ID': f'{telegram_id}'
-    }
     data = {
         "subject": subject,
         "teacher": teacher,
         "question": question,
         "answer": answer,
     }
-    response = requests.post(url=ANSWER_ENDPOINT, headers=headers, data=data)
-    return response.json()
+    return request(method="POST", url=ANSWER_ENDPOINT, telegram_id=telegram_id, data=data)

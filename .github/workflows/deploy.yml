@@ -54,6 +54,7 @@ jobs:
           script: |
             cd ${{ secrets.DEPLOY_REMOTE_TARGET }}
             source venv/bin/activate
+            pip uninstall timetablebot -y
             pip install timetablebot-1.0.0-0-py37-none-any.whl -U
             rm timetablebot-1.0.0-0-py37-none-any.whl
             sudo supervisorctl restart timetable-bot

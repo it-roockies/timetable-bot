@@ -51,5 +51,6 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /home/ubuntu/timetablebot/
+            sudo pip3 uninstall timetablebot -y
             sudo pip3 install timetablebot-1.0.0-0-py38-none-any.whl  -U
             sudo supervisorctl restart timetablebot
