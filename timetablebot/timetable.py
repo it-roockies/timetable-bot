@@ -14,6 +14,7 @@ TEACHER_ENDPOINT = f"{TIMETABLE_URL}/api/teacher/"
 GROUP_ENDPOINT = f"{TIMETABLE_URL}/api/group/"
 TODAY_LESSON_ENDPOINT = f"{TIMETABLE_URL}/api/grouplesson/"
 MESSAGE_ENDPOINT = f"{TIMETABLE_URL}/api/message/"
+NOTIFY_USER_ENDPOINT = f"{TIMETABLE_URL}/api/notify/"
 
 QUESTION_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
 ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
@@ -75,6 +76,20 @@ class Message(object):
             logger.error(f"{item} is not in messages")
             return item
         return messages[item]
+
+
+def notify_user(period: str, date: str):
+    headers = {
+        'Authorization': f'Bot {TIMETABLE_TOKEN}',
+    }
+    data = {
+        'period': period,
+        "date": date
+    }
+    response = requests.get(url=NOTIFY_USER_ENDPOINT, data=data, headers=headers)
+
+    return response.json()
+
 
 
 def get_messages():

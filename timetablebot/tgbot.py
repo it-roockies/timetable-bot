@@ -1,8 +1,9 @@
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardButton, InlineKeyboardMarkup
 import logging
 import time
 import os
-from datetime import date, datetime
+from datetime import date, time, datetime
+from pytz import timezone
 import json
 import requests
 from telegram.ext import (
@@ -12,6 +13,7 @@ from telegram.ext import (
     Filters,
     ConversationHandler,
     CallbackContext,
+    CallbackQueryHandler
 )
 
 from timetablebot.timetable import (
@@ -25,7 +27,8 @@ from timetablebot.timetable import (
     create_answer,
     get_choices,
     get_today,
-    get_messages
+    get_messages,
+    notify_user
 )
 from timetablebot.utils import build_menu
 
@@ -37,7 +40,8 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
-STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, QUESTION, ANSWER = range(10)
+STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, ASSESS, ANSWER = range(10)
+
 
 def this_day_info(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
@@ -55,6 +59,7 @@ def this_day_info(update: Update, context: CallbackContext):
     )
     return today_lessons
 
+
 def reform_day(obj):
     """formats lesson to human friendly format"""
     today_lsn = ''
@@ -67,10 +72,12 @@ def reform_day(obj):
         today_lsn += '\n\n'
     return today_lsn
 
+
 def presently(update: Update, context: CallbackContext):
     lesson = this_day_info(update, context)
     lesson = reform_day(lesson)
     update.message.reply_text(lesson)
+
 
 def at_present(update: Update, context: CallbackContext):
     today_lessons = this_day_info(update, context)
@@ -103,6 +110,7 @@ def today(update: Update, context: CallbackContext):
     update.message.reply_text(f'today you have:\n {lesson_text} Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
 
+
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
     choice_keyboard = [['assessing', 'today', 'now']]
@@ -125,6 +133,7 @@ def now(update: Update, context: CallbackContext):
             lesson += row
     update.message.reply_text(f'{lesson}. Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
+
 
 def get_student_id(update: Update, context: CallbackContext):
     messages = context.user_data['messages']
@@ -158,6 +167,7 @@ def choice(update, context):
                               reply_markup=keyboard)
     return CHOOSING
 
+
 def get_group(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Get groups from server.")
@@ -166,7 +176,9 @@ def get_group(update: Update, context: CallbackContext):
 
     reply_keyboard = [group['name'] for group in groups]
     messages = context.user_data['messages']
-    update.message.reply_text(messages.GROUP, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True, resize_keyboard=True))
+    update.message.reply_text(messages.GROUP,
+                              reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 4), one_time_keyboard=True,
+                                                               resize_keyboard=True))
 
     return GROUP
 
@@ -177,15 +189,18 @@ def get_subject(update: Update, context: CallbackContext):
     userinfo = get_userinfo(telegram_id=telegram_id)
     print(userinfo)
     minutes = datetime.now().minute + datetime.now().hour * 60
-    today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(), minutes=minutes)  # get today's lesson
+    today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
+                             minutes=minutes)  # get today's lesson
     if len(today_lesson) == 1 and 'message' in today_lesson:
         update.message.reply_text('today you have no classess. That is why you can`t assess.')
         return ConversationHandler.END
+
     subjects = [lesson['subject'] for lesson in today_lesson['today_lessons']]
     reply_keyboard = subjects  # [subject['name'] for subject in subjects]
     messages = context.user_data['messages']
-    update.message.reply_text(messages.COMMENTSUBJECT, reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3), one_time_keyboard=True, resize_keyboard=True))
-
+    update.message.reply_text(messages.COMMENTSUBJECT,
+                              reply_markup=ReplyKeyboardMarkup(build_menu(reply_keyboard, 3),
+                                                               one_time_keyboard=True, resize_keyboard=True))
     return SUBJECTS
 
 
@@ -197,17 +212,17 @@ def get_teacher(update: Update, context: CallbackContext):
     subject = context.user_data['subject']
     userinfo = get_userinfo(telegram_id=telegram_id)
     minutes = datetime.now().minute + datetime.now().hour * 60
-    today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(), minutes=minutes)  # get today's lesson
+    today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
+                             minutes=minutes)  # get today's lesson
     print(today_lesson)
     if 'message' in today_lesson:
         update.message.reply_text(today_lesson['message'])
         return CHOOSING
-    teacher = [lesson['teacher'] for lesson in today_lesson['today_lessons'] if lesson['subject'] == context.user_data['subject']]
+    teacher = [lesson['teacher'] for lesson in today_lesson['today_lessons'] if
+               lesson['subject'] == context.user_data['subject']]
     context.user_data['teacher'] = teacher[0]
 
     context.user_data["questions"] = get_questions(update.message.from_user.id)
-    # print(get_questions(update.message.from_user.id))
-    # if context.user_data['questions']['choice'] is None:
 
     context.user_data['current'] = 0
 
@@ -295,7 +310,6 @@ def group(update: Update, context: CallbackContext) -> int:
     return CHOOSING
 
 
-
 def choose_function(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Thank you working with us.', reply_markup=ReplyKeyboardRemove())
     if update.message.text == 'assessing':
@@ -304,6 +318,7 @@ def choose_function(update: Update, context: CallbackContext) -> int:
         return today(update, context)
     else:
         return now(update, context)
+
 
 # def education_year(update: Update, context: CallbackContext) -> int:
 #     update.message.reply_text("Thank you so much for your patience and effort.")
@@ -333,6 +348,26 @@ def subjects(update: Update, context: CallbackContext) -> int:
     return get_teacher(update, context)
 
 
+# using inline mode to give value of teacher and subject
+# use it
+def assess(update: Update, context: CallbackContext) -> int:
+    query = update.callback_query
+    query.answer()
+    telegram_id = query.data.split(' ')[-1]
+    context.user_data["questions"] = get_questions(telegram_id=telegram_id)
+    context.user_data['current'] = 0
+
+    if len(context.user_data['questions']) == 0:
+        update.effective_message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+    len_of_data = len(query.data.split(' '))
+    teacher = " ".join(query.data.split(' ')[len_of_data-3:len_of_data-1])
+    context.user_data['subject'] = query.data.split(' ')[0]
+    context.user_data['teacher'] = teacher
+    query.edit_message_text(text=f"you assess {query.data}")
+    return ask_question(update=update, context=context)
+
+
 def teacher(update: Update, context: CallbackContext) -> int:
     # context.user_data['teacher'] = update.message.text
 
@@ -345,7 +380,7 @@ def teacher(update: Update, context: CallbackContext) -> int:
     context.user_data['current'] = 0
 
     if len(context.user_data['questions']) == 0:
-        update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
+        update.effective_message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
 
     return ask_question(update=update, context=context)
@@ -353,33 +388,39 @@ def teacher(update: Update, context: CallbackContext) -> int:
 
 def ask_question(update, context):
     """asks question from user"""
-
     questions = context.user_data["questions"]
     current = context.user_data["current"]
     current_question = questions[current]
     question_text = current_question['question_text']
     if current_question['choice'] is None:
-        update.message.reply_text(question_text, reply_markup=ReplyKeyboardRemove())
+        print("I am here")
+        update.effective_message.reply_text(question_text, reply_markup=ReplyKeyboardRemove())
+        print("Here it is.")
         return ANSWER
     else:
         reply_keyboard = [json.loads(choice['variant']) for choice in get_choices(update.message.from_user.id) if
                           choice['id'] == current_question['choice']]
-        update.message.reply_text(question_text,
-                                  reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
-                                  )
+        update.effective_message.reply_text(question_text,
+                                            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True,
+                                                                             resize_keyboard=True)
+                                            )
 
         return ANSWER
 
 
 def answer(update: Update, context: CallbackContext) -> int:
-    telegram_id = update.message.from_user.id
+    telegram_id = update.effective_message.from_user.id
+    print(context.user_data)
+    messages = get_messages()
+    context.user_data['messages'] = messages
+    print(telegram_id)
     questions = context.user_data["questions"]
     subjects = get_subjects(telegram_id)  # getting all subjects from database
+    print(context.user_data['subject'])
     teachers = get_teachers(telegram_id)  # getting all teachers from database
+    print(context.user_data['teacher'])
     subject = [subject['id'] for subject in subjects if subject['short'] == context.user_data['subject']]
     teacher = [teacher['id'] for teacher in teachers if teacher['short'] == context.user_data['teacher']]
-
-
     current = context.user_data["current"]
     question = questions[current]
     # post answer
@@ -388,7 +429,7 @@ def answer(update: Update, context: CallbackContext) -> int:
         subject=subject[0],
         teacher=teacher[0],
         question=question["id"],
-        answer=update.message.text,
+        answer=update.effective_message.text,
     )
 
     if current < len(questions) - 1:
@@ -396,11 +437,27 @@ def answer(update: Update, context: CallbackContext) -> int:
         return ask_question(update=update, context=context)
     else:
         messages = context.user_data['messages']
-        update.message.reply_text(messages.END,
-                                  reply_markup=ReplyKeyboardRemove(),
-                                  )
+        update.effective_message.reply_text(messages.END,
+                                            reply_markup=ReplyKeyboardRemove(),
+                                            )
         return ConversationHandler.END
 
+
+def notify(context: CallbackContext):
+    period = context.job.context['period']
+    moment = date.today()  # get today's date
+    data = notify_user(period="3", date=moment)  # default period
+
+    for i in data:
+        if len(i['telegram_ids']) != 0:
+            for j in i['telegram_ids']:
+                keyboard = [
+                    [InlineKeyboardButton("Assess", callback_data=f'{i["subject"]} {i["teachers"][0]} {j}')]
+                ]
+                context.bot.send_message(chat_id=j, text=f"You have just finished:\n{i['subject']} - {i['teachers'][0]}"
+                                                         f" when ideas are hot and emotions are strong that is the time"
+                                                         f" to assess the lesson.",
+                                         reply_markup=InlineKeyboardMarkup(keyboard))
 
 def main() -> None:
     updater = Updater(token=TOKEN)
@@ -408,8 +465,10 @@ def main() -> None:
     dispatcher = updater.dispatcher
     today_handler = CommandHandler('today', presently)
     now_handler = CommandHandler('now', at_present)
+    assess_handler = CallbackQueryHandler(assess)
+# STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, ASSESS, ANSWER
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CommandHandler('start', start), CallbackQueryHandler(assess)],
         states={
             STUDENT_ID: [MessageHandler(Filters.text & ~Filters.command, student_id)],
             DATE_OF_BIRTH: [MessageHandler(Filters.text & ~Filters.command, date_of_birth)],
@@ -422,12 +481,31 @@ def main() -> None:
             ANSWER: [MessageHandler(Filters.text & ~Filters.command, answer)]
         },
         fallbacks=[CommandHandler('cancel', cancel)],
-
     )
 
     dispatcher.add_handler(handler=conv_handler)
     dispatcher.add_handler(handler=today_handler)
     dispatcher.add_handler(handler=now_handler)
+    dispatcher.add_handler(handler=assess_handler)
+    updater.job_queue.run_daily(notify, time=time(10, 5, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "1"})
+    updater.job_queue.run_daily(notify, time=time(11, 25, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "2"})
+
+    updater.job_queue.run_daily(notify, time=time(13, 5, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "3"})
+
+    updater.job_queue.run_daily(notify, time=time(14, 25, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "4"})
+
+    updater.job_queue.run_daily(notify, time=time(15, 45, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "5"})
+
+    updater.job_queue.run_daily(notify, time=time(17, 5, 0, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "6"})
+
+    updater.job_queue.run_daily(notify, time=time(9, 3, 20, tzinfo=timezone("Asia/Tashkent")),
+                                days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
     updater.start_polling()
 
     updater.idle()
