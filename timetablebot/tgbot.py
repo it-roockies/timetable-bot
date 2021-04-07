@@ -59,6 +59,9 @@ def this_day_info(update: Update, context: CallbackContext):
     )
     return today_lessons
 
+def backend_error(update, context):
+    update.message.reply_text('Sorry, some error happened in our system\nCome back later.')
+    return ConversationHandler.END
 
 def reform_day(obj):
     """formats lesson to human friendly format"""
@@ -110,6 +113,13 @@ def today(update: Update, context: CallbackContext):
     update.message.reply_text(f'today you have:\n {lesson_text} Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
 
+def unknown_function(update: Update, context: CallbackContext):
+    """handles unknown functionalities of bot"""
+    msg = "You want some unknown functionality from bot. \nPlease choose valid functionality"
+    choice_keyboard = [['assessing', 'today', 'now']]
+    keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    update.message.reply_text(msg, reply_markup=keyboard)
+    return CHOOSING
 
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
@@ -187,15 +197,15 @@ def get_subject(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Get subjects from server.")
     userinfo = get_userinfo(telegram_id=telegram_id)
-    print(userinfo)
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
-                             minutes=minutes)  # get today's lesson
+                             minutes=minutes)  # get today's lesson for a certain group
     if len(today_lesson) == 1 and 'message' in today_lesson:
         update.message.reply_text('today you have no classess. That is why you can`t assess.')
         return ConversationHandler.END
 
     subjects = [lesson['subject'] for lesson in today_lesson['today_lessons']]
+    context.user_data['subjects'] = subjects
     reply_keyboard = subjects  # [subject['name'] for subject in subjects]
     messages = context.user_data['messages']
     update.message.reply_text(messages.COMMENTSUBJECT,
@@ -214,7 +224,6 @@ def get_teacher(update: Update, context: CallbackContext):
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
                              minutes=minutes)  # get today's lesson
-    print(today_lesson)
     if 'message' in today_lesson:
         update.message.reply_text(today_lesson['message'])
         return CHOOSING
@@ -241,6 +250,8 @@ def get_teacher(update: Update, context: CallbackContext):
 
 def start(update: Update, context: CallbackContext) -> int:
     messages = get_messages()
+    if messages is None:  # checking if some error happens in server
+        return backend_error(update=update, context=context)
     context.user_data['messages'] = messages
     update.message.reply_text(messages.START, reply_markup=ReplyKeyboardRemove())
     telegram_id = update.message.from_user.id
@@ -264,7 +275,9 @@ def cancel(update: Update, context: CallbackContext) -> int:
 
 
 def student_id(update: Update, context: CallbackContext) -> int:
-    context.user_data['username'] = update.message.text.strip()
+    upcoming_username = update.message.text.strip()
+    username = 'u' + upcoming_username[1:]
+    context.user_data['username'] = username
     return get_date_of_birth(update, context)
 
 
@@ -301,9 +314,7 @@ def group(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much for your patience and effort.")
 
     context.user_data['group'] = group_name
-
     update_telegram_user(telegram_id=telegram_id, group=int(group))
-
     choice_keyboard = [['assessing', 'today', 'now']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)
@@ -316,8 +327,10 @@ def choose_function(update: Update, context: CallbackContext) -> int:
         return get_subject(update, context)
     elif update.message.text == 'today':
         return today(update, context)
-    else:
+    elif update.message.text == 'now':
         return now(update, context)
+    else:
+        return unknown_function(update, context)
 
 
 # def education_year(update: Update, context: CallbackContext) -> int:
@@ -344,6 +357,9 @@ def subjects(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much."
                               , reply_markup=ReplyKeyboardRemove(),
                               )
+    if update.message.text not in context.user_data['subjects']:
+        update.message.reply_text('You entered wrong subject,please enter correctly!')
+        return get_subject(update, context)
     context.user_data['subject'] = update.message.text
     return get_teacher(update, context)
 
@@ -445,10 +461,11 @@ def answer(update: Update, context: CallbackContext) -> int:
 
 def notify(context: CallbackContext):
     period = context.job.context['period']
+    print(period)
     moment = date.today()  # get today's date
-    data = notify_user(period="3", date=moment)  # default period
+    data = notify_user(period=period, date=moment)  # default period
 
-    for i in data:
+    for i in data:  # iterating each lesson of a given period
         if len(i['telegram_ids']) != 0:
             for j in i['telegram_ids']:
                 keyboard = [
@@ -457,7 +474,7 @@ def notify(context: CallbackContext):
                 context.bot.send_message(chat_id=j, text=f"You have just finished:\n{i['subject']} - {i['teachers'][0]}"
                                                          f" when ideas are hot and emotions are strong that is the time"
                                                          f" to assess the lesson.",
-                                         reply_markup=InlineKeyboardMarkup(keyboard))
+                                         reply_markup=InlineKeyboardMarkup(keyboard), disable_notification=True)
 
 def main() -> None:
     updater = Updater(token=TOKEN)
@@ -504,8 +521,8 @@ def main() -> None:
     updater.job_queue.run_daily(notify, time=time(17, 5, 0, tzinfo=timezone("Asia/Tashkent")),
                                 days=(0, 1, 2, 3, 4, 5), context={"period": "6"})
 
-    updater.job_queue.run_daily(notify, time=time(9, 3, 20, tzinfo=timezone("Asia/Tashkent")),
-                                days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
+    # updater.job_queue.run_daily(notify, time=time(15, 51, 0, tzinfo=timezone("Asia/Tashkent")),
+    #                             days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
     updater.start_polling()
 
     updater.idle()

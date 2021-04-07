@@ -55,13 +55,16 @@ def create_telegram_user(telegram_id: str, username: str, date_of_birth: str):
 
 
 def update_telegram_user(telegram_id: str, group: int):
-    data = {
-        "group": {
-            "id": group,
-        },
+    payload = "{\n    \"group\": {\n        \"id\": %d\n    }\n}" % group
+    headers = {
+        'Telegram-ID': f'{telegram_id}',
+        'Authorization': 'Bot 123',
+        'Content-Type': 'application/json',
+        'Cookie': 'csrftoken=TL5BAEM0E8pWJR13br0hbyJOEy8lhTpUHZkHmQ0GnDzqQaQSc7BfC8BNLjgl9ybC'
     }
-    return request(method="POST", url=TELEGRAM_USER_ENDPOINT, telegram_id=telegram_id, data=data)
 
+    response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
+    return response.json()
 
 class Message(object):
     def __init__(self, messages):
@@ -107,8 +110,7 @@ def get_today(telegram_id: str, group: str, date: str, minutes: int):
 
 
 def get_subjects(telegram_id: str):
-    response = requests.get(url=SUBJECT_ENDPOINT, telegram_id=telegram_id)
-    return response.json()
+    return request(method='GET', url=SUBJECT_ENDPOINT, telegram_id=telegram_id)
 
 
 def get_teachers(telegram_id: str):
