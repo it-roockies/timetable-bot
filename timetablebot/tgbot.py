@@ -270,13 +270,13 @@ def start(update: Update, context: CallbackContext) -> int:
 
 def cancel(update: Update, context: CallbackContext) -> int:
     messages = context.user_data['messages']
-    update.message.reply_text(messages.CANCEL)
+    update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 
 def student_id(update: Update, context: CallbackContext) -> int:
     upcoming_username = update.message.text.strip()
-    username = 'u' + upcoming_username[1:]
+    username = 'u' + upcoming_username[len(upcoming_username)-5:]
     context.user_data['username'] = username
     return get_date_of_birth(update, context)
 
@@ -380,7 +380,8 @@ def assess(update: Update, context: CallbackContext) -> int:
     teacher = " ".join(query.data.split(' ')[len_of_data-3:len_of_data-1])
     context.user_data['subject'] = query.data.split(' ')[0]
     context.user_data['teacher'] = teacher
-    query.edit_message_text(text=f"you assess {query.data}")
+    assessed_object = ' '.join(query.data.split(' ')[:-1])
+    query.edit_message_text(text=f"you assess {assessed_object}")
     return ask_question(update=update, context=context)
 
 
@@ -521,8 +522,8 @@ def main() -> None:
     updater.job_queue.run_daily(notify, time=time(17, 5, 0, tzinfo=timezone("Asia/Tashkent")),
                                 days=(0, 1, 2, 3, 4, 5), context={"period": "6"})
 
-    # updater.job_queue.run_daily(notify, time=time(15, 51, 0, tzinfo=timezone("Asia/Tashkent")),
-    #                             days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
+    # updater.job_queue.run_daily(notify, time=time(11, 36, 0, tzinfo=timezone("Asia/Tashkent")),
+    #                              days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
     updater.start_polling()
 
     updater.idle()
