@@ -174,6 +174,11 @@ def get_date_of_birth(update: Update, context: CallbackContext):
 
 
 def get_term(update: Update, context: CallbackContext):
+    questions = [question for question in get_questions(telegram_id=update.message.from_user.id) if not question['quick_mode']]
+    print("q-> ", questions)
+    if len(questions) == 0:
+        update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
     get_term_message = 'Please, choose which semester are you going to give your feedback?'
     reply_keyboard = [['1', '2']]
     keyboard = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
@@ -262,7 +267,8 @@ def get_teacher(update: Update, context: CallbackContext):
                lesson['subject'] == context.user_data['subject']]
     context.user_data['teacher'] = teacher[0]
 
-    context.user_data["questions"] = get_questions(update.message.from_user.id)
+    questions = [question for question in get_questions(update.message.from_user.id) if question['quick_mode']]
+    context.user_data["questions"] = questions
 
     context.user_data['current'] = 0
 
@@ -402,7 +408,9 @@ def module(update: Update, context: CallbackContext) -> int:
 def tutor(update: Update, context: CallbackContext) -> int:
     context.user_data['teacher'] = update.message.text
     print(context.user_data['teacher'])
-    context.user_data["questions"] = get_questions(update.message.from_user.id)
+    questions = [question for question in get_questions(update.message.from_user.id) if not question['quick_mode']]
+
+    context.user_data["questions"] = questions
     context.user_data['current'] = 0
 
     if len(context.user_data['questions']) == 0:
@@ -428,7 +436,7 @@ def assess(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
     telegram_id = query.data.split(' ')[-1]
-    context.user_data["questions"] = get_questions(telegram_id=telegram_id)
+    context.user_data["questions"] = [question for question in get_questions(telegram_id=telegram_id) if question['quick_mode']]
     context.user_data['current'] = 0
 
     if len(context.user_data['questions']) == 0:
@@ -444,13 +452,8 @@ def assess(update: Update, context: CallbackContext) -> int:
 
 
 def teacher(update: Update, context: CallbackContext) -> int:
-    # context.user_data['teacher'] = update.message.text
-
-    # get a question from database
-    # print(get_choices(update.message.from_user.id))
-    context.user_data["questions"] = get_questions(update.message.from_user.id)
-    # print(get_questions(update.message.from_user.id))
-    # if context.user_data['questions']['choice'] is None:
+    telegram_id = update.message.from_user.id
+    context.user_data["questions"] = [question for question in get_questions(telegram_id=telegram_id) if question['quick_mode']]
 
     context.user_data['current'] = 0
 
