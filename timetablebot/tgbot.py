@@ -109,7 +109,7 @@ def timetable(update: Update, context: CallbackContext):
     return CHOOSING
 
 def questionnaire(update: Update, context: CallbackContext):
-    questionnaire_keyboard = [['Quick', 'Slow']]
+    questionnaire_keyboard = [['Quick', 'Slow', 'Stop']]
     reply_keyboard = ReplyKeyboardMarkup(questionnaire_keyboard, one_time_keyboard=True, resize_keyboard=True)
     message = "You have a choice to choose the mode of questionnaire"
     update.effective_message.reply_text(message, reply_markup=reply_keyboard)
@@ -180,7 +180,7 @@ def get_term(update: Update, context: CallbackContext):
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
     get_term_message = 'Please, choose which semester are you going to give your feedback?'
-    reply_keyboard = [['1', '2']]
+    reply_keyboard = [['1', '2'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(get_term_message, reply_markup=keyboard)
     return SEMESTER
@@ -192,7 +192,7 @@ def get_tutors(update: Update, context: CallbackContext):
     print(teachers)
     if teachers is None:
         return backend_error(update, context)
-    reply_keyboard = ReplyKeyboardMarkup([teachers['teachers']], one_time_keyboard=True, resize_keyboard=True)
+    reply_keyboard = ReplyKeyboardMarkup([teachers['teachers'], ['Stop']], one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please, Choose which teacher to comment', reply_markup=reply_keyboard)
     return TUTOR
 
@@ -383,6 +383,10 @@ def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
     # find which level of this user
+    if update.message.text == 'Stop':
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
     term = update.message.text
     if 'G' in group:
         level = level_in_group['G']
@@ -394,18 +398,26 @@ def semester(update: Update, context: CallbackContext) -> int:
     if modules is None:
         update.message.reply_text('It seems you are PY student. We are working on Your level now.')
         return ConversationHandler.END
-    reply_keyboard = ReplyKeyboardMarkup([modules['subjects']], resize_keyboard=True, one_time_keyboard=True)
+    reply_keyboard = ReplyKeyboardMarkup([modules['subjects'], ['Stop']], resize_keyboard=True, one_time_keyboard=True)
     update.message.reply_text('Please, Choose which module to comment', reply_markup=reply_keyboard)
     return MODULE
 
 
 def module(update: Update, context: CallbackContext) -> int:
+    if update.message.text == 'Stop':
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
     subject = update.message.text
     context.user_data['subject'] = subject
     return get_tutors(update, context)
 
 
 def tutor(update: Update, context: CallbackContext) -> int:
+    if update.message.text == 'Stop':
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
     context.user_data['teacher'] = update.message.text
     print(context.user_data['teacher'])
     questions = [question for question in get_questions(update.message.from_user.id) if not question['quick_mode']]
