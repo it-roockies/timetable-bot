@@ -7,6 +7,8 @@ logger = logging.getLogger(__name__)
 TIMETABLE_URL = os.environ.get("TIMETABLE_URL")
 TIMETABLE_TOKEN = os.environ.get("TIMETABLE_TOKEN")
 
+GET_SUBJECTS_FOR_LEVEL_ENDPOINT = f"{TIMETABLE_URL}/api/levelsubject/"
+GET_TEACHERS_FOR_LEVEL_ENDPOINT = f"{TIMETABLE_URL}/api/levelteacher/"
 TELEGRAM_USER_ENDPOINT = f"{TIMETABLE_URL}/api/telegramuser/"
 TELEGRAM_BOT_ENDPOINT = f"{TIMETABLE_URL}/api/telegrambot/"
 SUBJECT_ENDPOINT = f"{TIMETABLE_URL}/api/subject/"
@@ -137,3 +139,18 @@ def create_answer(telegram_id: str, subject: int, teacher: int, question: int, a
         "answer": answer,
     }
     return request(method="POST", url=ANSWER_ENDPOINT, telegram_id=telegram_id, data=data)
+
+def get_subjects_for_term(telegram_id: str, level: int, term: int):
+    data = {
+        'level': level,
+        'term': term
+    }
+    return request(method='GET', url=GET_SUBJECTS_FOR_LEVEL_ENDPOINT, telegram_id=telegram_id, data=data)
+
+def get_teacher_for_term(telegram_id: str, subject: str):
+    data = {
+        'subject': subject
+    }
+    return request(method='GET', url=GET_TEACHERS_FOR_LEVEL_ENDPOINT, telegram_id=telegram_id, data=data)
+
+

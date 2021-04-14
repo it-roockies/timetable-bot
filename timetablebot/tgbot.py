@@ -28,7 +28,9 @@ from timetablebot.timetable import (
     get_choices,
     get_today,
     get_messages,
-    notify_user
+    notify_user,
+    get_subjects_for_term,
+    get_teacher_for_term
 )
 from timetablebot.utils import build_menu
 
@@ -40,8 +42,9 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
-STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SUBJECTS, TEACHER, ASSESS, ANSWER = range(10)
+STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SEMESTER, MODULE, TUTOR, SUBJECTS, TEACHER, ASSESS, ANSWER = range(13)
 
+level_in_group = {'19': 1, '18': 2, '17': 3, 'G': 0}
 
 def this_day_info(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
@@ -98,11 +101,24 @@ def at_present(update: Update, context: CallbackContext):
             lesson += row
     update.message.reply_text(lesson)
 
+def timetable(update: Update, context: CallbackContext):
+    timetable_keyboard = [['Today', 'Now', 'Stop']]
+    reply_keyboard = ReplyKeyboardMarkup(timetable_keyboard, resize_keyboard=True, one_time_keyboard=True)
+    message = "Please, choose which type?"
+    update.effective_message.reply_text(message, reply_markup=reply_keyboard)
+    return CHOOSING
+
+def questionnaire(update: Update, context: CallbackContext):
+    questionnaire_keyboard = [['Quick', 'Slow']]
+    reply_keyboard = ReplyKeyboardMarkup(questionnaire_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    message = "You have a choice to choose the mode of questionnaire"
+    update.effective_message.reply_text(message, reply_markup=reply_keyboard)
+    return CHOOSING
 
 def today(update: Update, context: CallbackContext):
     """returns today's lessons for user"""
     today_lessons = this_day_info(update, context)  # get today's lesson
-    choice_keyboard = [['assessing', 'today', 'now']]
+    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     if 'message' in today_lessons:
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
@@ -116,14 +132,14 @@ def today(update: Update, context: CallbackContext):
 def unknown_function(update: Update, context: CallbackContext):
     """handles unknown functionalities of bot"""
     msg = "You want some unknown functionality from bot. \nPlease choose valid functionality"
-    choice_keyboard = [['assessing', 'today', 'now']]
+    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(msg, reply_markup=keyboard)
     return CHOOSING
 
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
-    choice_keyboard = [['assessing', 'today', 'now']]
+    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     today_lessons = this_day_info(update, context)  # get today's lesson
 
@@ -157,21 +173,27 @@ def get_date_of_birth(update: Update, context: CallbackContext):
     return DATE_OF_BIRTH
 
 
-# def get_education_year(update: Update):
-#     reply_keyboard = [['1', '2', '3', '4']]
-#     update.message.reply_text(
-#         "Please tell me about your education year "
-#         "for example (1, 2, 3, 4)",
-#         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True),
-#     )
-#     return EDUCATION_YEAR
+def get_term(update: Update, context: CallbackContext):
+    get_term_message = 'Please, choose which semester are you going to give your feedback?'
+    reply_keyboard = [['1', '2']]
+    keyboard = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    update.message.reply_text(get_term_message, reply_markup=keyboard)
+    return SEMESTER
+
+def get_tutors(update: Update, context: CallbackContext):
+    subject = context.user_data['subject']
+    telegram_id = update.message.from_user.id
+    teachers = get_teacher_for_term(telegram_id=telegram_id, subject=subject)
+    print(teachers)
+    if teachers is None:
+        return backend_error(update, context)
+    reply_keyboard = ReplyKeyboardMarkup([teachers['teachers']], one_time_keyboard=True, resize_keyboard=True)
+    update.message.reply_text('Please, Choose which teacher to comment', reply_markup=reply_keyboard)
+    return TUTOR
 
 
-# def get_faculty(update: Update):
-#     update.message.reply_text("Now you need to tell me your faculty")
-#     return FACULTY
 def choice(update, context):
-    choice_keyboard = [['assessing', 'today', 'now']]
+    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(f'Please choose what do you want?',
                               reply_markup=keyboard)
@@ -201,10 +223,19 @@ def get_subject(update: Update, context: CallbackContext):
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
                              minutes=minutes)  # get today's lesson for a certain group
     if len(today_lesson) == 1 and 'message' in today_lesson:
-        update.message.reply_text('today you have no classess. That is why you can`t assess.')
+        update.message.reply_text('today you have no classes. That is why you can`t assess.')
         return ConversationHandler.END
 
-    subjects = [lesson['subject'] for lesson in today_lesson['today_lessons']]
+    subjects = []
+    teachers = []
+    # checking duplicate subjects in choosing list
+    for lesson in today_lesson['today_lessons']:
+        if lesson['subject'] not in subjects:
+            subjects.append(lesson['subject'])
+            teachers.append(lesson['teacher'])
+        else:
+            if lesson['teacher'] not in teachers:
+                subjects.append(lesson['subject'])
     context.user_data['subjects'] = subjects
     reply_keyboard = subjects  # [subject['name'] for subject in subjects]
     messages = context.user_data['messages']
@@ -252,7 +283,7 @@ def start(update: Update, context: CallbackContext) -> int:
     messages = get_messages()
     if messages is None:  # checking if some error happens in server
         return backend_error(update=update, context=context)
-    context.user_data['messages'] = messages
+    context.user_data['messages'] = messages  # getting messages in database
     update.message.reply_text(messages.START, reply_markup=ReplyKeyboardRemove())
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
@@ -315,7 +346,7 @@ def group(update: Update, context: CallbackContext) -> int:
 
     context.user_data['group'] = group_name
     update_telegram_user(telegram_id=telegram_id, group=int(group))
-    choice_keyboard = [['assessing', 'today', 'now']]
+    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
@@ -323,35 +354,62 @@ def group(update: Update, context: CallbackContext) -> int:
 
 def choose_function(update: Update, context: CallbackContext) -> int:
     update.message.reply_text('Thank you working with us.', reply_markup=ReplyKeyboardRemove())
-    if update.message.text == 'assessing':
+    if update.message.text == 'Timetable':
+        return timetable(update, context)
+    elif update.message.text == 'Questionnaire':
+        return questionnaire(update, context)
+    elif update.message.text == 'Quick':
         return get_subject(update, context)
-    elif update.message.text == 'today':
+    elif update.message.text == 'Today':
         return today(update, context)
-    elif update.message.text == 'now':
+    elif update.message.text == 'Now':
         return now(update, context)
+    elif update.message.text == 'Stop':
+        messages = context.user_data['messages']
+        update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+    elif update.message.text == 'Slow':
+        return get_term(update, context)
     else:
         return unknown_function(update, context)
 
+def semester(update: Update, context: CallbackContext) -> int:
+    telegram_id = update.message.from_user.id
+    group = get_userinfo(telegram_id)['group']['name']
+    # find which level of this user
+    term = update.message.text
+    if 'G' in group:
+        level = level_in_group['G']
+    else:
+        key = group[-2:]
+        level = level_in_group[key]
+    context.user_data['level'] = level
+    modules = get_subjects_for_term(telegram_id=telegram_id, level=int(level), term=int(term))
+    if modules is None:
+        update.message.reply_text('It seems you are PY student. We are working on Your level now.')
+        return ConversationHandler.END
+    reply_keyboard = ReplyKeyboardMarkup([modules['subjects']], resize_keyboard=True, one_time_keyboard=True)
+    update.message.reply_text('Please, Choose which module to comment', reply_markup=reply_keyboard)
+    return MODULE
 
-# def education_year(update: Update, context: CallbackContext) -> int:
-#     update.message.reply_text("Thank you so much for your patience and effort.")
-#     context.user_data['education_year'] = int(update.message.text)
-#     return get_faculty(update)
+
+def module(update: Update, context: CallbackContext) -> int:
+    subject = update.message.text
+    context.user_data['subject'] = subject
+    return get_tutors(update, context)
 
 
-# def faculty(update: Update, context: CallbackContext) -> int:
-#     update.message.reply_text("Cool. One more thing.")
+def tutor(update: Update, context: CallbackContext) -> int:
+    context.user_data['teacher'] = update.message.text
+    print(context.user_data['teacher'])
+    context.user_data["questions"] = get_questions(update.message.from_user.id)
+    context.user_data['current'] = 0
 
-#     telegram_id = update.message.from_user.id
-#     logger.info(f"{telegram_id}: Update users education_year and faculty.")
-#     update_telegram_user(
-#         telegram_id=telegram_id,
-#         education_year=context.user_data['education_year'],
-#         faculty=update.message.text
-#     )
+    if len(context.user_data['questions']) == 0:
+        update.effective_message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
 
-#     return get_subject(update, context)
-
+    return ask_question(update=update, context=context)
 
 def subjects(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much."
@@ -410,9 +468,7 @@ def ask_question(update, context):
     current_question = questions[current]
     question_text = current_question['question_text']
     if current_question['choice'] is None:
-        print("I am here")
         update.effective_message.reply_text(question_text, reply_markup=ReplyKeyboardRemove())
-        print("Here it is.")
         return ANSWER
     else:
         reply_keyboard = [json.loads(choice['variant']) for choice in get_choices(update.message.from_user.id) if
@@ -427,17 +483,16 @@ def ask_question(update, context):
 
 def answer(update: Update, context: CallbackContext) -> int:
     telegram_id = update.effective_message.from_user.id
-    print(context.user_data)
     messages = get_messages()
     context.user_data['messages'] = messages
-    print(telegram_id)
     questions = context.user_data["questions"]
     subjects = get_subjects(telegram_id)  # getting all subjects from database
-    print(context.user_data['subject'])
     teachers = get_teachers(telegram_id)  # getting all teachers from database
-    print(context.user_data['teacher'])
     subject = [subject['id'] for subject in subjects if subject['short'] == context.user_data['subject']]
     teacher = [teacher['id'] for teacher in teachers if teacher['short'] == context.user_data['teacher']]
+    if len(subject) == 0 and len(teacher) == 0:
+        subject = [subject['id'] for subject in subjects if subject['name'] == context.user_data['subject']]
+        teacher = [teacher['id'] for teacher in teachers if teacher['firstname'] + ' ' + teacher['lastname'] == context.user_data['teacher']]
     current = context.user_data["current"]
     question = questions[current]
     # post answer
@@ -462,7 +517,6 @@ def answer(update: Update, context: CallbackContext) -> int:
 
 def notify(context: CallbackContext):
     period = context.job.context['period']
-    print(period)
     moment = date.today()  # get today's date
     data = notify_user(period=period, date=moment)  # default period
 
@@ -494,6 +548,9 @@ def main() -> None:
             CHOOSING: [MessageHandler(Filters.text & ~Filters.command, choose_function)],
             TODAY: [MessageHandler(Filters.text & ~Filters.command, today)],
             NOW: [MessageHandler(Filters.text & ~Filters.command, now)],
+            SEMESTER: [MessageHandler(Filters.text & ~Filters.command, semester)],
+            MODULE: [MessageHandler(Filters.text & ~Filters.command, module)],
+            TUTOR: [MessageHandler(Filters.text & ~Filters.command, tutor)],
             SUBJECTS: [MessageHandler(Filters.text & ~Filters.command, subjects)],
             TEACHER: [MessageHandler(Filters.text & ~Filters.command, teacher)],
             ANSWER: [MessageHandler(Filters.text & ~Filters.command, answer)]
