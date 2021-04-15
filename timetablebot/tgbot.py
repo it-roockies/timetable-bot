@@ -62,6 +62,12 @@ def this_day_info(update: Update, context: CallbackContext):
     )
     return today_lessons
 
+def is_in(obj: list, value: str):
+    for i in obj:
+        if value in i:
+            return True
+    return False
+
 def backend_error(update, context):
     update.message.reply_text('Sorry, some error happened in our system\nCome back later.')
     return ConversationHandler.END
@@ -181,6 +187,7 @@ def get_term(update: Update, context: CallbackContext):
         return ConversationHandler.END
     get_term_message = 'Please, choose which semester are you going to give your feedback?'
     reply_keyboard = [['1', '2'], ['Stop']]
+    context.user_data['term_choice'] = reply_keyboard
     keyboard = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(get_term_message, reply_markup=keyboard)
     return SEMESTER
@@ -193,6 +200,7 @@ def get_tutors(update: Update, context: CallbackContext):
     if teachers is None:
         return backend_error(update, context)
     reply_keyboard = ReplyKeyboardMarkup([teachers['teachers'], ['Stop']], one_time_keyboard=True, resize_keyboard=True)
+    context.user_data['term_teacher_choice'] = [teachers['teachers'], ['Stop']]
     update.message.reply_text('Please, Choose which teacher to comment', reply_markup=reply_keyboard)
     return TUTOR
 
@@ -383,6 +391,10 @@ def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
     # find which level of this user
+    if not is_in(obj=context.user_data['term_choice'], value=update.message.text):  # check if choice entered correctly
+        wrong_choice_message = 'You entered inappropriate choice, please try again.'
+        update.message.reply_text(wrong_choice_message)
+        return get_term(update, context)
     if update.message.text == 'Stop':
         messages = context.user_data['messages']
         update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
@@ -395,15 +407,22 @@ def semester(update: Update, context: CallbackContext) -> int:
         level = level_in_group[key]
     context.user_data['level'] = level
     modules = get_subjects_for_term(telegram_id=telegram_id, level=int(level), term=int(term))
+    print(modules)
     if modules is None:
         update.message.reply_text('It seems you are PY student. We are working on Your level now.')
         return ConversationHandler.END
     reply_keyboard = ReplyKeyboardMarkup([modules['subjects'], ['Stop']], resize_keyboard=True, one_time_keyboard=True)
+    context.user_data['term_subject_choice'] = [modules['subjects'], ['Stop']]
     update.message.reply_text('Please, Choose which module to comment', reply_markup=reply_keyboard)
     return MODULE
 
 
 def module(update: Update, context: CallbackContext) -> int:
+    print(context.user_data['term_subject_choice'])
+    if not is_in(obj=context.user_data['term_subject_choice'], value=update.message.text):  # check if choice entered correctly
+        wrong_choice_message = 'You entered inappropriate choice, please try again.'
+        update.message.reply_text(wrong_choice_message)
+        return get_term(update, context)
     if update.message.text == 'Stop':
         messages = context.user_data['messages']
         update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
@@ -414,6 +433,10 @@ def module(update: Update, context: CallbackContext) -> int:
 
 
 def tutor(update: Update, context: CallbackContext) -> int:
+    if not is_in(obj=context.user_data['term_teacher_choice'], value=update.message.text):  # check if choice entered correctly
+        wrong_choice_message = 'You entered inappropriate choice, please try again.'
+        update.message.reply_text(wrong_choice_message)
+        return get_tutors(update, context)
     if update.message.text == 'Stop':
         messages = context.user_data['messages']
         update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
