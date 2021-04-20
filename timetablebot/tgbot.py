@@ -69,6 +69,8 @@ level_in_group = {'19': 1, '18': 2, '17': 3, 'G': 0}
 def this_day_info(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     user_info = get_userinfo(telegram_id)
+    if user_info is None:
+        return backend_error(update, context)
     group = user_info['group']['name']
     global date
     date = date.today()
@@ -197,7 +199,8 @@ def now(update: Update, context: CallbackContext):
     choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     today_lessons = this_day_info(update, context)  # get today's lesson
-
+    if today_lessons is None:
+        return backend_error(update, context)
     if 'message' in today_lessons:
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
         return CHOOSING
@@ -233,7 +236,6 @@ def get_date_of_birth(update: Update, context: CallbackContext):
 
 def get_term(update: Update, context: CallbackContext):
     questions = [question for question in get_questions(telegram_id=update.message.from_user.id)]
-    print("q-> ", questions)
     if len(questions) == 0:
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
@@ -248,7 +250,6 @@ def get_tutors(update: Update, context: CallbackContext):
     subject = context.user_data['subject']
     telegram_id = update.message.from_user.id
     teachers = get_teacher_for_term(telegram_id=telegram_id, subject=subject)
-    print(teachers)
     if teachers is None:
         return backend_error(update, context)
     reply_keyboard = ReplyKeyboardMarkup([teachers['teachers'], ['Stop']], one_time_keyboard=True, resize_keyboard=True)
@@ -267,9 +268,10 @@ def choice(update, context):
 
 def get_group(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
-    print(telegram_id)
     logger.info(f"{telegram_id}: Get groups from server.")
     groups = get_groups(telegram_id)
+    if groups is None:
+        return backend_error(update, context)
     context.user_data['groups'] = groups
 
     reply_keyboard = [group['name'] for group in groups]
@@ -285,9 +287,13 @@ def get_subject(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Get subjects from server.")
     userinfo = get_userinfo(telegram_id=telegram_id)
+    if userinfo is None:
+        return backend_error(update, context)
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
                              minutes=minutes)  # get today's lesson for a certain group
+    if today_lesson is None:
+        return backend_error(update, context)
     if len(today_lesson) == 1 and 'message' in today_lesson:
         update.message.reply_text('today you have no classes. That is why you can`t assess.')
         return ConversationHandler.END
@@ -318,9 +324,12 @@ def get_teacher(update: Update, context: CallbackContext):
     # reply_keyboard = [teacher['short'] for teacher in teachers]
     subject = context.user_data['subject']
     userinfo = get_userinfo(telegram_id=telegram_id)
+    if userinfo is None:
+        return backend_error(update, context)
     minutes = datetime.now().minute + datetime.now().hour * 60
     today_lesson = get_today(telegram_id=telegram_id, group=userinfo['group']['name'], date=date.today(),
                              minutes=minutes)  # get today's lesson
+
     if 'message' in today_lesson:
         update.message.reply_text(today_lesson['message'])
         return CHOOSING
@@ -395,26 +404,17 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
         date_of_birth=update.message.text.strip(),
         key=context.user_data['failure']
     )
-    print(user_info.json())
-    if user_info.json() and 'id' in user_info.json():
+    print(user_info)
+    if user_info and type(user_info) == dict and 'id' in user_info:
         logger.info(f"{telegram_id}: User exist in Database.")
         return get_group(update, context)
-    elif user_info.json()['detail'] == INVALID_USER:
+    elif user_info == INVALID_USER:
         context.user_data['failure'] = 1
         return get_date_of_birth(update, context)
-    else:
-        if context.user_data['failure'] == 1:
-            user_info = create_telegram_user(
-                telegram_id=update.message.from_user.id,
-                username=context.user_data['username'],
-                date_of_birth=update.message.text.strip(),
-                key=context.user_data['failure']
-            )
-            return get_group(update, context)
-        logger.info(f"{telegram_id}: User is not exist in Database.")
-        messages = context.user_data['messages']
-        update.message.reply_text(messages.NOTFOUND)
-        return get_student_id(update, context)
+    logger.info(f"{telegram_id}: User is not exist in Database.")
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.NOTFOUND)
+    return get_student_id(update, context)
 
 
 def group(update: Update, context: CallbackContext) -> int:
@@ -492,6 +492,7 @@ def choose_function(update: Update, context: CallbackContext) -> int:
 def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
+
     # find which level of this user
     if not is_in(obj=context.user_data['term_choice'], value=update.message.text):  # check if choice entered correctly
         wrong_choice_message = 'You entered inappropriate choice, please try again.'
@@ -509,7 +510,6 @@ def semester(update: Update, context: CallbackContext) -> int:
         level = level_in_group[key]
     context.user_data['level'] = level
     modules = get_subjects_for_term(telegram_id=telegram_id, level=int(level), term=int(term))
-    print(modules)
     if modules is None:
         update.message.reply_text('It seems you are PY student. We are working on Your level now.')
         return ConversationHandler.END
@@ -543,7 +543,6 @@ def tutor(update: Update, context: CallbackContext) -> int:
         update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
     context.user_data['teacher'] = update.message.text
-    print(context.user_data['teacher'])
     questions = [question for question in get_questions(update.message.from_user.id) if not question['quick_mode']]
 
     context.user_data["questions"] = questions

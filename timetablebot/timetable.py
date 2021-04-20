@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 TIMETABLE_URL = os.environ.get("TIMETABLE_URL")
 TIMETABLE_TOKEN = os.environ.get("TIMETABLE_TOKEN")
+# TIMETABLE_TOKEN = 'gqEsoda5JyA9sPjM0soL7tkujaVKMImW'
+# TIMETABLE_URL = 'http://timetable.polito.uz'
 
 GET_SUBJECTS_FOR_LEVEL_ENDPOINT = f"{TIMETABLE_URL}/api/levelsubject/"
 GET_TEACHERS_FOR_LEVEL_ENDPOINT = f"{TIMETABLE_URL}/api/levelteacher/"
@@ -44,7 +46,7 @@ def request(*, method: str, url: str, telegram_id=None, data=None):
         logger.exception(str(e))
         if hasattr(e, "response"):
             logger.debug(e.response.text)
-            if e.response.text == INVALID_USER:
+            if e.response.text == '{"detail":"'+INVALID_USER+'"}':
                 return INVALID_USER
         return None
 
@@ -54,14 +56,13 @@ def get_userinfo(telegram_id: str):
 
 
 def create_telegram_user(telegram_id: str, username: str, date_of_birth: str, key: int):
-    headers = {
-        'Authorization': 'Bot 123',
-        'Content-Type': 'application/json',
-        'Cookie': 'csrftoken=TL5BAEM0E8pWJR13br0hbyJOEy8lhTpUHZkHmQ0GnDzqQaQSc7BfC8BNLjgl9ybC'
+    payload={
+        "username": username,
+        "date_of_birth": date_of_birth,
+        "telegram_id": telegram_id,
+        "key": key
     }
-    payload="{\n    \"username\": \"%s\",\n    \"date_of_birth\": \"%s\",\n    \"telegram_id\": \"%s\",\n    \"key\": %d\n}" % (username, date_of_birth, telegram_id, key)
-
-    return requests.request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=payload, headers=headers)
+    return request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=payload)
 
 
 def update_telegram_user(telegram_id: str, group: int):
