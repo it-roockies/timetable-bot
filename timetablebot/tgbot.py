@@ -2,7 +2,7 @@ from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKey
 import logging
 import time
 import os
-from datetime import date, time, datetime
+from datetime import date, time, datetime, timedelta
 from pytz import timezone
 import json
 import requests
@@ -15,6 +15,8 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
+
+
 
 from timetablebot.timetable import (
     get_userinfo,
@@ -30,7 +32,9 @@ from timetablebot.timetable import (
     get_messages,
     notify_user,
     get_subjects_for_term,
-    get_teacher_for_term
+    get_teacher_for_term,
+    get_free_rooms,
+    INVALID_USER
 )
 from timetablebot.utils import build_menu
 
@@ -42,8 +46,24 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 logger.info(f"Starting telegram bot with TOKEN: {TOKEN}")
 
-STUDENT_ID, DATE_OF_BIRTH, GROUP, CHOOSING, TODAY, NOW, SEMESTER, MODULE, TUTOR, SUBJECTS, TEACHER, ASSESS, ANSWER = range(13)
-
+(
+    STUDENT_ID,
+    DATE_OF_BIRTH,
+    GROUP,
+    CHOOSING,
+    BOOKING,
+    ROOM,
+    TODAY,
+    NOW,
+    SEMESTER,
+    MODULE,
+    TUTOR,
+    SUBJECTS,
+    TEACHER,
+    ASSESS,
+    ANSWER,
+) = range(15)
+STUDENT = 0
 level_in_group = {'19': 1, '18': 2, '17': 3, 'G': 0}
 
 def this_day_info(update: Update, context: CallbackContext):
@@ -63,6 +83,7 @@ def this_day_info(update: Update, context: CallbackContext):
     return today_lessons
 
 def is_in(obj: list, value: str):
+    """helps to handle malware choice """
     for i in obj:
         if value in i:
             return True
@@ -84,6 +105,34 @@ def reform_day(obj):
         today_lsn += '\n\n'
     return today_lsn
 
+def get_booking_from_user(update, context):
+    answer = update.message.text
+    if answer not in ['Yes', 'No']:
+        msg = "You entered unknown answer please choose valid one"
+        update.message.reply_text(msg)
+        return get_date_of_booking(update, context)
+    if answer == 'Yes':
+        pass
+    else:
+        global STUDENT
+        STUDENT += 1
+
+def get_date_of_booking(update, context):
+    day = date.today()  # get today's date
+    weekday_today = day.weekday()  # which number in week
+    end_date = day + timedelta(5 - weekday_today)  # get end of the week
+    weekday_end_date = end_date.weekday()  # which number in week
+    day_of_the_week = {0: f'Monday {day + timedelta(0-day.weekday())}',
+                       1: f'Tuesday {day + timedelta(1-day.weekday())}',
+                       2: f'Wednesday {day + timedelta(2-day.weekday())}',
+                       3: f'Thursday {day + timedelta(3-day.weekday())}',
+                       4: f'Friday {day + timedelta(4-day.weekday())}',
+                       5: f'Saturday {day + timedelta(5-day.weekday())}'
+                       }
+    days = [[day_of_the_week[day]] for day in range(weekday_today, weekday_end_date + 1)]
+    reply_keyboard = ReplyKeyboardMarkup(days, one_time_keyboard=True, resize_keyboard=True)
+    update.message.reply_text("Choose booking date:", reply_markup=reply_keyboard)
+    return BOOKING
 
 def presently(update: Update, context: CallbackContext):
     lesson = this_day_info(update, context)
@@ -124,7 +173,7 @@ def questionnaire(update: Update, context: CallbackContext):
 def today(update: Update, context: CallbackContext):
     """returns today's lessons for user"""
     today_lessons = this_day_info(update, context)  # get today's lesson
-    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
+    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     if 'message' in today_lessons:
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
@@ -138,14 +187,14 @@ def today(update: Update, context: CallbackContext):
 def unknown_function(update: Update, context: CallbackContext):
     """handles unknown functionalities of bot"""
     msg = "You want some unknown functionality from bot. \nPlease choose valid functionality"
-    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
+    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(msg, reply_markup=keyboard)
     return CHOOSING
 
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
-    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
+    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     today_lessons = this_day_info(update, context)  # get today's lesson
 
@@ -175,12 +224,15 @@ def get_student_id(update: Update, context: CallbackContext):
 
 def get_date_of_birth(update: Update, context: CallbackContext):
     messages = context.user_data['messages']
-    update.message.reply_text(messages.BIRTH)
+    if context.user_data['failure'] == 1:
+        update.message.reply_text(messages.BIRTH_AGAIN)
+    else:
+        update.message.reply_text(messages.BIRTH)
     return DATE_OF_BIRTH
 
 
 def get_term(update: Update, context: CallbackContext):
-    questions = [question for question in get_questions(telegram_id=update.message.from_user.id) if not question['quick_mode']]
+    questions = [question for question in get_questions(telegram_id=update.message.from_user.id)]
     print("q-> ", questions)
     if len(questions) == 0:
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
@@ -206,7 +258,7 @@ def get_tutors(update: Update, context: CallbackContext):
 
 
 def choice(update, context):
-    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
+    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(f'Please choose what do you want?',
                               reply_markup=keyboard)
@@ -215,6 +267,7 @@ def choice(update, context):
 
 def get_group(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
+    print(telegram_id)
     logger.info(f"{telegram_id}: Get groups from server.")
     groups = get_groups(telegram_id)
     context.user_data['groups'] = groups
@@ -295,6 +348,7 @@ def get_teacher(update: Update, context: CallbackContext):
 
 def start(update: Update, context: CallbackContext) -> int:
     messages = get_messages()
+    context.user_data['failure'] = 0
     if messages is None:  # checking if some error happens in server
         return backend_error(update=update, context=context)
     context.user_data['messages'] = messages  # getting messages in database
@@ -320,6 +374,7 @@ def cancel(update: Update, context: CallbackContext) -> int:
 
 
 def student_id(update: Update, context: CallbackContext) -> int:
+    """ get username of a student in our format """
     upcoming_username = update.message.text.strip()
     username = 'u' + upcoming_username[len(upcoming_username)-5:]
     context.user_data['username'] = username
@@ -328,18 +383,34 @@ def student_id(update: Update, context: CallbackContext) -> int:
 
 def date_of_birth(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Thank you so much.")
-
+    if len(update.message.text.strip()) != 10:
+        update.message.reply_text('You entered wrong format of your date of birth, please enter correctly.')
+        return get_date_of_birth(update, context)
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Check if user exist in Database.")
+    print(context.user_data['failure'])
     user_info = create_telegram_user(
         telegram_id=update.message.from_user.id,
         username=context.user_data['username'],
-        date_of_birth=update.message.text.strip()
+        date_of_birth=update.message.text.strip(),
+        key=context.user_data['failure']
     )
-    if user_info and 'id' in user_info:
+    print(user_info.json())
+    if user_info.json() and 'id' in user_info.json():
         logger.info(f"{telegram_id}: User exist in Database.")
         return get_group(update, context)
+    elif user_info.json()['detail'] == INVALID_USER:
+        context.user_data['failure'] = 1
+        return get_date_of_birth(update, context)
     else:
+        if context.user_data['failure'] == 1:
+            user_info = create_telegram_user(
+                telegram_id=update.message.from_user.id,
+                username=context.user_data['username'],
+                date_of_birth=update.message.text.strip(),
+                key=context.user_data['failure']
+            )
+            return get_group(update, context)
         logger.info(f"{telegram_id}: User is not exist in Database.")
         messages = context.user_data['messages']
         update.message.reply_text(messages.NOTFOUND)
@@ -360,7 +431,7 @@ def group(update: Update, context: CallbackContext) -> int:
 
     context.user_data['group'] = group_name
     update_telegram_user(telegram_id=telegram_id, group=int(group))
-    choice_keyboard = [['Timetable', 'Questionnaire', 'Stop']]
+    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)
     return CHOOSING
@@ -372,6 +443,8 @@ def choose_function(update: Update, context: CallbackContext) -> int:
         return timetable(update, context)
     elif update.message.text == 'Questionnaire':
         return questionnaire(update, context)
+    elif update.message.text == 'Booking\nroom':
+        return get_date_of_booking(update, context)
     elif update.message.text == 'Quick':
         return get_subject(update, context)
     elif update.message.text == 'Today':
@@ -387,6 +460,35 @@ def choose_function(update: Update, context: CallbackContext) -> int:
     else:
         return unknown_function(update, context)
 
+
+# def booking(update: Update, context: CallbackContext) -> int:
+#     day = update.message.text.split(' ')[1]
+#     telegram_id = update.message.from_user.id
+#     free_rooms = get_free_rooms(telegram_id=telegram_id, date=day)
+#     text = ''
+#     rooms = []
+#     for room in free_rooms:
+#         for k, v in room.items():
+#             if k == 'classroom':
+#                 rooms.append(v)
+#             text += f'{k}:   {v}\n'
+#         text += '\n'
+#     keyboard = ReplyKeyboardMarkup(build_menu(rooms, 4))
+#     update.message.reply_text(f'Here is free rooms, Choose one:\n\n {text}', reply_markup=keyboard)
+#     return ROOM
+#
+# def room(update: Update, context: CallbackContext) -> int:
+#     chosen_room = update.message.text
+#
+#     if STUDENT == 1:  # first student is responsible
+#         keyboard = [['Yes', 'No']]
+#         reply_keyboard = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+#         update.message.reply_text(f"Are you sure you are going to be a responsible for {chosen_room} room?",
+#                                   reply_markup=reply_keyboard
+#                                   )
+#
+#         return get_booking_from_user(update, context)
+#
 def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
@@ -418,7 +520,6 @@ def semester(update: Update, context: CallbackContext) -> int:
 
 
 def module(update: Update, context: CallbackContext) -> int:
-    print(context.user_data['term_subject_choice'])
     if not is_in(obj=context.user_data['term_subject_choice'], value=update.message.text):  # check if choice entered correctly
         wrong_choice_message = 'You entered inappropriate choice, please try again.'
         update.message.reply_text(wrong_choice_message)
@@ -584,6 +685,8 @@ def main() -> None:
             DATE_OF_BIRTH: [MessageHandler(Filters.text & ~Filters.command, date_of_birth)],
             GROUP: [MessageHandler(Filters.text & ~Filters.command, group)],
             CHOOSING: [MessageHandler(Filters.text & ~Filters.command, choose_function)],
+#            BOOKING: [MessageHandler(Filters.text & ~Filters.command, booking)],
+#            ROOM: [MessageHandler(Filters.text & ~Filters.command, room)],
             TODAY: [MessageHandler(Filters.text & ~Filters.command, today)],
             NOW: [MessageHandler(Filters.text & ~Filters.command, now)],
             SEMESTER: [MessageHandler(Filters.text & ~Filters.command, semester)],

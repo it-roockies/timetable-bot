@@ -17,10 +17,14 @@ GROUP_ENDPOINT = f"{TIMETABLE_URL}/api/group/"
 TODAY_LESSON_ENDPOINT = f"{TIMETABLE_URL}/api/grouplesson/"
 MESSAGE_ENDPOINT = f"{TIMETABLE_URL}/api/message/"
 NOTIFY_USER_ENDPOINT = f"{TIMETABLE_URL}/api/notify/"
+FREE_ROOM_ENDPOINT = f"{TIMETABLE_URL}/api/freeroom/"
+
 
 QUESTION_ENDPOINT = f"{TIMETABLE_URL}/api/question/"
 ANSWER_ENDPOINT = f"{TIMETABLE_URL}/api/answer/"
 CHOICE_ENDPOINT = f"{TIMETABLE_URL}/api/choice/"
+
+INVALID_USER = 'Invalid user!'
 
 
 def request(*, method: str, url: str, telegram_id=None, data=None):
@@ -40,6 +44,8 @@ def request(*, method: str, url: str, telegram_id=None, data=None):
         logger.exception(str(e))
         if hasattr(e, "response"):
             logger.debug(e.response.text)
+            if e.response.text == INVALID_USER:
+                return INVALID_USER
         return None
 
 
@@ -47,13 +53,15 @@ def get_userinfo(telegram_id: str):
     return request(method="GET", url=TELEGRAM_USER_ENDPOINT, telegram_id=telegram_id)
 
 
-def create_telegram_user(telegram_id: str, username: str, date_of_birth: str):
-    data = {
-        'telegram_id': f'{telegram_id}',
-        'username': username,
-        'date_of_birth': date_of_birth,
+def create_telegram_user(telegram_id: str, username: str, date_of_birth: str, key: int):
+    headers = {
+        'Authorization': 'Bot 123',
+        'Content-Type': 'application/json',
+        'Cookie': 'csrftoken=TL5BAEM0E8pWJR13br0hbyJOEy8lhTpUHZkHmQ0GnDzqQaQSc7BfC8BNLjgl9ybC'
     }
-    return request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=data)
+    payload="{\n    \"username\": \"%s\",\n    \"date_of_birth\": \"%s\",\n    \"telegram_id\": \"%s\",\n    \"key\": %d\n}" % (username, date_of_birth, telegram_id, key)
+
+    return requests.request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=payload, headers=headers)
 
 
 def update_telegram_user(telegram_id: str, group: int):
@@ -154,3 +162,8 @@ def get_teacher_for_term(telegram_id: str, subject: str):
     return request(method='GET', url=GET_TEACHERS_FOR_LEVEL_ENDPOINT, telegram_id=telegram_id, data=data)
 
 
+def get_free_rooms(telegram_id: str, date):
+    data = {
+        'date': date
+    }
+    return request(method='GET', url=FREE_ROOM_ENDPOINT, telegram_id=telegram_id, data=data)
