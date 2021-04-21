@@ -397,14 +397,12 @@ def date_of_birth(update: Update, context: CallbackContext) -> int:
         return get_date_of_birth(update, context)
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: Check if user exist in Database.")
-    print(context.user_data['failure'])
     user_info = create_telegram_user(
         telegram_id=update.message.from_user.id,
         username=context.user_data['username'],
         date_of_birth=update.message.text.strip(),
         key=context.user_data['failure']
     )
-    print(user_info)
     if user_info and type(user_info) == dict and 'id' in user_info:
         logger.info(f"{telegram_id}: User exist in Database.")
         return get_group(update, context)
@@ -570,7 +568,8 @@ def subjects(update: Update, context: CallbackContext) -> int:
 def assess(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
-    telegram_id = query.data.split(' ')[-1]
+    data = json.loads('{'+query.data+'}')
+    telegram_id = data['tg']
     context.user_data["questions"] = [question for question in get_questions(telegram_id=telegram_id) if question['quick_mode']]
     context.user_data['current'] = 0
 
@@ -578,10 +577,10 @@ def assess(update: Update, context: CallbackContext) -> int:
         update.effective_message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
     len_of_data = len(query.data.split(' '))
-    teacher = " ".join(query.data.split(' ')[len_of_data-3:len_of_data-1])
-    context.user_data['subject'] = query.data.split(' ')[0]
+    teacher = data['t']
+    context.user_data['subject'] = data['s']
     context.user_data['teacher'] = teacher
-    assessed_object = ' '.join(query.data.split(' ')[:-1])
+    assessed_object = data['s'] + ' ' + data['t']
     query.edit_message_text(text=f"you assess {assessed_object}")
     return ask_question(update=update, context=context)
 
@@ -662,8 +661,9 @@ def notify(context: CallbackContext):
         if len(i['telegram_ids']) != 0:
             for j in i['telegram_ids']:
                 keyboard = [
-                    [InlineKeyboardButton("Assess", callback_data=f'{i["subject"]} {i["teachers"][0]} {j}')]
-                ]
+                    [InlineKeyboardButton("Assess",
+                                          callback_data=f'"s":"{i["subject"]}","t":"{i["teachers"][0]}","tg":"{j}"')]
+                    ]
                 context.bot.send_message(chat_id=j, text=f"You have just finished:\n{i['subject']} - {i['teachers'][0]}"
                                                          f" when ideas are hot and emotions are strong that is the time"
                                                          f" to assess the lesson.",
@@ -719,8 +719,8 @@ def main() -> None:
     updater.job_queue.run_daily(notify, time=time(17, 5, 0, tzinfo=timezone("Asia/Tashkent")),
                                 days=(0, 1, 2, 3, 4, 5), context={"period": "6"})
 
-    # updater.job_queue.run_daily(notify, time=time(11, 36, 0, tzinfo=timezone("Asia/Tashkent")),
-    #                              days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
+    # updater.job_queue.run_daily(notify, time=time(18, 54, 0, tzinfo=timezone("Asia/Tashkent")),
+    #                             days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
     updater.start_polling()
 
     updater.idle()
