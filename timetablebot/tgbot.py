@@ -69,6 +69,7 @@ level_in_group = {'19': 1, '18': 2, '17': 3, 'G': 0}
 def this_day_info(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
     user_info = get_userinfo(telegram_id)
+    print(user_info)
     if user_info is None:
         return backend_error(update, context)
     group = user_info['group']['name']

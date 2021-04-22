@@ -66,16 +66,10 @@ def create_telegram_user(telegram_id: str, username: str, date_of_birth: str, ke
 
 
 def update_telegram_user(telegram_id: str, group: int):
-    payload = "{\n    \"group\": {\n        \"id\": %d\n    }\n}" % group
-    headers = {
-        'Telegram-ID': f'{telegram_id}',
-        'Authorization': 'Bot 123',
-        'Content-Type': 'application/json',
-        'Cookie': 'csrftoken=TL5BAEM0E8pWJR13br0hbyJOEy8lhTpUHZkHmQ0GnDzqQaQSc7BfC8BNLjgl9ybC'
-    }
+    payload = {"group": group}
 
-    response = requests.request("POST", url=TELEGRAM_USER_ENDPOINT, headers=headers, data=payload)
-    return response.json()
+    response = request(method="POST", url=TELEGRAM_USER_ENDPOINT, data=payload, telegram_id=telegram_id)
+    return response
 
 class Message(object):
     def __init__(self, messages):
