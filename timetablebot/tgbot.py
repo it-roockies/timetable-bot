@@ -236,6 +236,14 @@ def get_date_of_birth(update: Update, context: CallbackContext):
 
 
 def get_term(update: Update, context: CallbackContext):
+    user_group = get_userinfo(update.message.from_user.id)['group']['name']
+    print(user_group)
+    if 'G' in user_group:
+        msg = 'You are PY student. That is why you can not use slow mode.'
+        choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+        keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
+        update.message.reply_text(msg, reply_markup=keyboard)
+        return CHOOSING
     questions = [question for question in get_questions(telegram_id=update.message.from_user.id)]
     if len(questions) == 0:
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
@@ -346,10 +354,9 @@ def get_teacher(update: Update, context: CallbackContext):
     if len(context.user_data['questions']) == 0:
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
-
-    update.message.reply_text(
-        f"You are assessing professor {teacher[0]} "
-    )
+    messages = context.user_data['messages']
+    which_teacher_message = messages.WHICH_PROFESSOR
+    update.message.reply_text(f"{which_teacher_message} {teacher[0]}")
 
     return ask_question(update=update, context=context)
 
@@ -460,38 +467,39 @@ def choose_function(update: Update, context: CallbackContext) -> int:
         return unknown_function(update, context)
 
 
-# def booking(update: Update, context: CallbackContext) -> int:
-#     day = update.message.text.split(' ')[1]
-#     telegram_id = update.message.from_user.id
-#     free_rooms = get_free_rooms(telegram_id=telegram_id, date=day)
-#     text = ''
-#     rooms = []
-#     for room in free_rooms:
-#         for k, v in room.items():
-#             if k == 'classroom':
-#                 rooms.append(v)
-#             text += f'{k}:   {v}\n'
-#         text += '\n'
-#     keyboard = ReplyKeyboardMarkup(build_menu(rooms, 4))
-#     update.message.reply_text(f'Here is free rooms, Choose one:\n\n {text}', reply_markup=keyboard)
-#     return ROOM
-#
-# def room(update: Update, context: CallbackContext) -> int:
-#     chosen_room = update.message.text
-#
-#     if STUDENT == 1:  # first student is responsible
-#         keyboard = [['Yes', 'No']]
-#         reply_keyboard = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
-#         update.message.reply_text(f"Are you sure you are going to be a responsible for {chosen_room} room?",
-#                                   reply_markup=reply_keyboard
-#                                   )
-#
-#         return get_booking_from_user(update, context)
-#
+def booking(update: Update, context: CallbackContext) -> int:
+    day = update.message.text.split(' ')[1]
+    telegram_id = update.message.from_user.id
+    print(day)
+    free_rooms = get_free_rooms(telegram_id=telegram_id, date=day)
+    print(free_rooms)
+    text = ''
+    rooms = []
+    for room in free_rooms:
+        for k, v in room.items():
+            if k == 'classroom':
+                rooms.append(v)
+            text += f'{k}:   {v}\n'
+        text += '\n'
+    keyboard = ReplyKeyboardMarkup(build_menu(rooms, 4))
+    update.message.reply_text(f'Here is free rooms, Choose one:\n\n {text}', reply_markup=keyboard)
+    return ROOM
+
+def room(update: Update, context: CallbackContext) -> int:
+    chosen_room = update.message.text
+
+    if STUDENT == 1:  # first student is responsible
+        keyboard = [['Yes', 'No']]
+        reply_keyboard = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+        update.message.reply_text(f"Are you sure you are going to be a responsible for {chosen_room} room?",
+                                  reply_markup=reply_keyboard
+                                  )
+
+        return get_booking_from_user(update, context)
+
 def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
-
     # find which level of this user
     if not is_in(obj=context.user_data['term_choice'], value=update.message.text):  # check if choice entered correctly
         wrong_choice_message = 'You entered inappropriate choice, please try again.'
@@ -641,11 +649,13 @@ def answer(update: Update, context: CallbackContext) -> int:
         question=question["id"],
         answer=update.effective_message.text,
     )
-
     if current < len(questions) - 1:
         context.user_data['current'] = current + 1
         return ask_question(update=update, context=context)
     else:
+        # increment student's attendance of questionnaire
+        group_id = get_userinfo(update.message.from_user.id)['group']['id']
+        update_telegram_user(telegram_id=telegram_id, group=group_id, attended_questionnaire=1)
         messages = context.user_data['messages']
         update.effective_message.reply_text(messages.END,
                                             reply_markup=ReplyKeyboardRemove(),

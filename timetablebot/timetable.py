@@ -65,8 +65,10 @@ def create_telegram_user(telegram_id: str, username: str, date_of_birth: str, ke
     return request(method="POST", url=TELEGRAM_BOT_ENDPOINT, data=payload)
 
 
-def update_telegram_user(telegram_id: str, group: int):
-    payload = {"group": group}
+def update_telegram_user(telegram_id: str, group: int, attended_questionnaire: int):
+    payload = {"group": group,
+               "attended_questionnaire": attended_questionnaire
+               }
 
     response = request(method="POST", url=TELEGRAM_USER_ENDPOINT, data=payload, telegram_id=telegram_id)
     return response
