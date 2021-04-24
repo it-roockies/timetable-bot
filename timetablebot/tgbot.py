@@ -237,13 +237,6 @@ def get_date_of_birth(update: Update, context: CallbackContext):
 
 def get_term(update: Update, context: CallbackContext):
     user_group = get_userinfo(update.message.from_user.id)['group']['name']
-    print(user_group)
-    if 'G' in user_group:
-        msg = 'You are PY student. That is why you can not use slow mode.'
-        choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
-        keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
-        update.message.reply_text(msg, reply_markup=keyboard)
-        return CHOOSING
     questions = [question for question in get_questions(telegram_id=update.message.from_user.id)]
     if len(questions) == 0:
         update.message.reply_text("Sorry, but there are no questions.", reply_markup=ReplyKeyboardRemove())
@@ -261,7 +254,8 @@ def get_tutors(update: Update, context: CallbackContext):
     teachers = get_teacher_for_term(telegram_id=telegram_id, subject=subject)
     if teachers is None:
         return backend_error(update, context)
-    reply_keyboard = ReplyKeyboardMarkup([teachers['teachers'], ['Stop']], one_time_keyboard=True, resize_keyboard=True)
+    keyboard = teachers['teachers'] + ['Stop']
+    reply_keyboard = ReplyKeyboardMarkup(build_menu(keyboard, 4), one_time_keyboard=True, resize_keyboard=True)
     context.user_data['term_teacher_choice'] = [teachers['teachers'], ['Stop']]
     update.message.reply_text('Please, Choose which teacher to comment', reply_markup=reply_keyboard)
     return TUTOR
@@ -500,8 +494,12 @@ def room(update: Update, context: CallbackContext) -> int:
 def semester(update: Update, context: CallbackContext) -> int:
     telegram_id = update.message.from_user.id
     group = get_userinfo(telegram_id)['group']['name']
+    chosen = update.message.text
+    if 'G' in group:
+        chosen = '1'
+
     # find which level of this user
-    if not is_in(obj=context.user_data['term_choice'], value=update.message.text):  # check if choice entered correctly
+    if not is_in(obj=context.user_data['term_choice'], value=chosen):  # check if choice entered correctly
         wrong_choice_message = 'You entered inappropriate choice, please try again.'
         update.message.reply_text(wrong_choice_message)
         return get_term(update, context)
@@ -509,7 +507,7 @@ def semester(update: Update, context: CallbackContext) -> int:
         messages = context.user_data['messages']
         update.message.reply_text(messages.CANCEL, reply_markup=ReplyKeyboardRemove())
         return ConversationHandler.END
-    term = update.message.text
+    term = chosen
     if 'G' in group:
         level = level_in_group['G']
     else:
@@ -520,7 +518,8 @@ def semester(update: Update, context: CallbackContext) -> int:
     if modules is None:
         update.message.reply_text('It seems you are PY student. We are working on Your level now.')
         return ConversationHandler.END
-    reply_keyboard = ReplyKeyboardMarkup([modules['subjects'], ['Stop']], resize_keyboard=True, one_time_keyboard=True)
+    keyboard = modules['subjects'] + ['Stop']
+    reply_keyboard = ReplyKeyboardMarkup(build_menu(keyboard, 4), resize_keyboard=True, one_time_keyboard=True)
     context.user_data['term_subject_choice'] = [modules['subjects'], ['Stop']]
     update.message.reply_text('Please, Choose which module to comment', reply_markup=reply_keyboard)
     return MODULE
@@ -656,8 +655,10 @@ def answer(update: Update, context: CallbackContext) -> int:
         # increment student's attendance of questionnaire
         group_id = get_userinfo(update.message.from_user.id)['group']['id']
         update_telegram_user(telegram_id=telegram_id, group=group_id, attended_questionnaire=1)
+        number_of_attendance = get_userinfo(telegram_id=telegram_id)['attended_questionnaire']
         messages = context.user_data['messages']
-        update.effective_message.reply_text(messages.END,
+        message = f'{messages.END}.\nYou have attended in this questionnaire\n {number_of_attendance} time(s)'
+        update.effective_message.reply_text(message,
                                             reply_markup=ReplyKeyboardRemove(),
                                             )
         return ConversationHandler.END
@@ -730,7 +731,7 @@ def main() -> None:
     updater.job_queue.run_daily(notify, time=time(17, 5, 0, tzinfo=timezone("Asia/Tashkent")),
                                 days=(0, 1, 2, 3, 4, 5), context={"period": "6"})
 
-    # updater.job_queue.run_daily(notify, time=time(18, 54, 0, tzinfo=timezone("Asia/Tashkent")),
+    # updater.job_queue.run_daily(notify, time=time(14, 6, 0, tzinfo=timezone("Asia/Tashkent")),
     #                             days=(0, 1, 2, 3, 4, 5), context={"period": "test"})
     updater.start_polling()
 
