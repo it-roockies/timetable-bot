@@ -162,8 +162,9 @@ def at_present(update: Update, context: CallbackContext):
 def timetable(update: Update, context: CallbackContext):
     timetable_keyboard = [['Today', 'Now', 'Stop']]
     reply_keyboard = ReplyKeyboardMarkup(timetable_keyboard, resize_keyboard=True, one_time_keyboard=True)
-    message = "Please, choose which type?"
-    update.effective_message.reply_text(message, reply_markup=reply_keyboard)
+    messages = context.user_data['messages']
+
+    update.effective_message.reply_text(messages.CHOOSE, reply_markup=reply_keyboard)
     return CHOOSING
 
 def questionnaire(update: Update, context: CallbackContext):
@@ -176,28 +177,31 @@ def questionnaire(update: Update, context: CallbackContext):
 def today(update: Update, context: CallbackContext):
     """returns today's lessons for user"""
     today_lessons = this_day_info(update, context)  # get today's lesson
-    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+    messages = context.user_data['messages']
+    choice_keyboard = [['Timetable', messages.ASSESS], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     if 'message' in today_lessons:
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
         return CHOOSING
 
     lesson_text = reform_day(today_lessons)
-
-    update.message.reply_text(f'today you have:\n {lesson_text} Please choose what do you want?', reply_markup=keyboard)
+    messages = context.user_data['messages']
+    update.message.reply_text(f'today you have:\n {lesson_text} {messages.SELECT}', reply_markup=keyboard)
     return CHOOSING
 
 def unknown_function(update: Update, context: CallbackContext):
     """handles unknown functionalities of bot"""
     msg = "You want some unknown functionality from bot. \nPlease choose valid functionality"
-    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+    messages = context.user_data['messages']
+    choice_keyboard = [['Timetable', messages.ASSESS], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     update.message.reply_text(msg, reply_markup=keyboard)
     return CHOOSING
 
 def now(update: Update, context: CallbackContext):
     """returns what should user need to do right now"""
-    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+    messages = context.user_data['messages']
+    choice_keyboard = [['Timetable', messages.ASSESS], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
     today_lessons = this_day_info(update, context)  # get today's lesson
     if today_lessons is None:
@@ -206,8 +210,9 @@ def now(update: Update, context: CallbackContext):
         update.message.reply_text(today_lessons['message'], reply_markup=keyboard)
         return CHOOSING
     msg = today_lessons['now_lesson']
+    messages = context.user_data['messages']
     if 'message' in today_lessons:
-        update.message.reply_text(f'{today_lessons["message"]}. Please choose what do you want?', reply_markup=keyboard)
+        update.message.reply_text(f'{today_lessons["message"]}. {messages.SELECT}', reply_markup=keyboard)
         return CHOOSING
     if 'message' in msg:
         lesson = msg['message']
@@ -216,7 +221,8 @@ def now(update: Update, context: CallbackContext):
         for k, v in msg.items():
             row = f"{k}:    {v} \n"
             lesson += row
-    update.message.reply_text(f'{lesson}. Please choose what do you want?', reply_markup=keyboard)
+    messages = context.user_data['messages']
+    update.message.reply_text(f'{lesson}. {messages.SELECT}', reply_markup=keyboard)
     return CHOOSING
 
 
@@ -257,14 +263,17 @@ def get_tutors(update: Update, context: CallbackContext):
     keyboard = teachers['teachers'] + ['Stop']
     reply_keyboard = ReplyKeyboardMarkup(build_menu(keyboard, 4), one_time_keyboard=True, resize_keyboard=True)
     context.user_data['term_teacher_choice'] = [teachers['teachers'], ['Stop']]
-    update.message.reply_text('Please, Choose which teacher to comment', reply_markup=reply_keyboard)
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.QUESTIONNAIRE, reply_markup=reply_keyboard)
     return TUTOR
 
 
 def choice(update, context):
-    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+    messages = context.user_data['messages']
+    choice_keyboard = [['Timetable', messages.ASSESS], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
-    update.message.reply_text(f'Please choose what do you want?',
+    messages = context.user_data['messages']
+    update.message.reply_text(f'{messages.SELECT}',
                               reply_markup=keyboard)
     return CHOOSING
 
@@ -363,7 +372,7 @@ def start(update: Update, context: CallbackContext) -> int:
     if messages is None:  # checking if some error happens in server
         return backend_error(update=update, context=context)
     context.user_data['messages'] = messages  # getting messages in database
-    update.message.reply_text(messages.START, reply_markup=ReplyKeyboardRemove())
+    update.message.reply_html(messages.START, reply_markup=ReplyKeyboardRemove())
     telegram_id = update.message.from_user.id
     logger.info(f"{telegram_id}: New user started the bot.")
     user_info = get_userinfo(telegram_id)
@@ -431,9 +440,11 @@ def group(update: Update, context: CallbackContext) -> int:
 
     context.user_data['group'] = group_name
     update_telegram_user(telegram_id=telegram_id, group=int(group))
-    choice_keyboard = [['Timetable', 'Questionnaire'], ['Stop']]
+    messages = context.user_data['messages']
+    choice_keyboard = [['Timetable', messages.ASSESS], ['Stop']]
     keyboard = ReplyKeyboardMarkup(keyboard=choice_keyboard, one_time_keyboard=True, resize_keyboard=True)
-    update.message.reply_text('Please choose what do you want?', reply_markup=keyboard)
+    messages = context.user_data['messages']
+    update.message.reply_text(messages.SELECT, reply_markup=keyboard)
     return CHOOSING
 
 
@@ -589,7 +600,8 @@ def assess(update: Update, context: CallbackContext) -> int:
     context.user_data['subject'] = data['s']
     context.user_data['teacher'] = teacher
     assessed_object = data['s'] + ' ' + data['t']
-    query.edit_message_text(text=f"you assess {assessed_object}")
+    messages = context.user_data['messages']
+    query.edit_message_text(text=f"{messages.ASSESS} {assessed_object}")
     return ask_question(update=update, context=context)
 
 
@@ -658,7 +670,7 @@ def answer(update: Update, context: CallbackContext) -> int:
         number_of_attendance = get_userinfo(telegram_id=telegram_id)['attended_questionnaire']
         messages = context.user_data['messages']
         message = f'{messages.END}.\nYou have attended in this questionnaire\n {number_of_attendance} time(s)'
-        update.effective_message.reply_text(message,
+        update.effective_message.reply_html(message,
                                             reply_markup=ReplyKeyboardRemove(),
                                             )
         return ConversationHandler.END
